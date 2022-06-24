@@ -1,5 +1,5 @@
 ---
-title: "Modelización de series de tiempo de precios mayoristas de manzana de Uruguay."
+title: "Modelización de serie de tiempo de precios mayoristas de manzana de Uruguay."
 author: "Emanuelle Marsella, Maximiliano Saldaña"
 date: "Junio 2022"
 output: 
@@ -81,7 +81,7 @@ grid.arrange(a, b, nrow = 1)
 ```{r descomp}
 # Ver si incluir y en qué parte
 
-descomp <- stl(manzana, s.window = "periodic")
+descomp <- stl(manzana, s.window = 13)
 
 autoplot(descomp) +
   theme_bw()
@@ -89,8 +89,6 @@ autoplot(descomp) +
 
 
 # Metodología y resultados
-
-PLAN DE ACCIÓN:
 
 ```{r train_test}
 # Se divide en muestra de training y de test
@@ -101,15 +99,16 @@ autoplot(manzana_train) +
   theme_bw()
 ```
 
+
 ```{r modelo1}
-# MODELO SIN INTERVENCIONES
+# MODELO IDENTIFICACIÓN MANUAL
 
 ## La transformación logarítmica no sería apropiada acá: la serie no aumenta en varianza con un aumento de media
 ## y el lambda de la transformación Box-Cox es != 0
 BoxCox.lambda(manzana_train)
 
 # Autocorrelación, serie original
-acf1 <- ggAcf(manzana_train, type = "correlation", plot = FALSE, lag = 36) 
+acf1 <- ggAcf(manzana_train, type = "correlation", plot = FALSE, lag = 56) 
 plot_acf1 <- autoplot(acf1) +
   labs(title = NULL) +
   theme_bw()
@@ -118,7 +117,7 @@ plot_acf1 <- autoplot(acf1) +
 ## haber autocorrelaciones significativas
 
 # Autocorrelación parcial, serie original
-pacf1 <- ggAcf(manzana_train, type = "partial", plot = FALSE,lag = 36)
+pacf1 <- ggAcf(manzana_train, type = "partial", plot = FALSE,lag = 56)
 plot_pacf1 <- autoplot(pacf1) +
   labs(title = NULL) +
   theme_bw()
@@ -130,7 +129,11 @@ grid.arrange(plot_acf1, plot_pacf1)
 # Test de raices unitarias
 test_df_mod1 <- ur.df(manzana_train)
 summary(test_df_mod1)
-## No rechazamos la hipótesis nula de que hay una raíz unitaria
+
+test_pp_mod1 <- ur.pp(manzana_train)
+summary(test_pp_mod1)
+
+## No rechazamos la hipótesis nula de que hay una raíz unitaria, usando los dos tests
 
 ## Probamos con una primera diferencia
 manzana_train_diff <- diff(manzana_train)
@@ -160,15 +163,81 @@ grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 test_df_mod1_diff <- ur.df(manzana_train_diff)
 summary(test_df_mod1_diff)
 
+
+test_pp_mod1_diff <- ur.pp(manzana_train_diff)
+summary(test_pp_mod1_diff)
 ## Rechazamos la hipótesis de raíces unitarias
 
 
-# MODELO CON INTERVENCION MANUAL POR LA PANDEMIA
+## Capaz se puede interpretar como un ARMA(2,1,1)(0,0,2)_12 
+modelo1 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0))
+
+summary(modelo1)
+r1 <- residuals(modelo1)
+
+## Gráfico de los residuos: los outliers causarán problemas con la normalidad
+autoplot(r1)
+
+## Prueba de Ljung-Box
+p_valores_box1 <- tibble(
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r1, lag = i, type = "Ljung-Box")$p.value)
+  )
+
+## No se rechaza la hipótesis nula de autocorrelación
+p_valores_box1 %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw()
+
+## Test de normalidad de Shapiro-Wilks y Jarque-Bera
+shapiro.test(r1)
+JarqueBera.test(r1)
+
+
+## Se rechaza la hipótesis nula de normalidad
+
+
+## El problema son los outliers de principio del año, capaz ts_clean?
+
+manzana_train_diff_clean <- tsclean(manzana_train)
+
+autoplot(manzana_train_diff_clean)
+
+modelo1_clean <- Arima(manzana_train_diff, order = c(2, 0, 1), seasonal = c(0, 0, 2))
+
+r1_clean <- residuals(modelo1_clean)
+
+## Gráfico de los residuos: los outliers causarán problemas con la normalidad
+autoplot(r1_clean)
+
+## Prueba de Ljung-Box
+p_valores_box1_clean <- tibble(
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r1_clean, lag = i, type = "Ljung-Box")$p.value)
+  )
+
+## No se rechaza la hipótesis nula de autocorrelación
+p_valores_box1_clean %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw()
+
+## Test de normalidad de Shapiro-Wilks
+shapiro.test(r1_clean)
+JarqueBera.test(r1_clean)
+
+## Se rechaza la hipótesis nula de normalidad
+
+
+# Probamos con insertar dummies
+
+
+
+
+
 
 ```
-
-
-
 
 
 
@@ -184,12 +253,12 @@ modelo2 <- auto.arima(manzana_train)
 r2 <- residuals(modelo2)
 
 ## Gráfico de los residuos: los outliers causarán problemas con la normalidad
-autoplot(r1)
+autoplot(r2)
 
 ## Prueba de Ljung-Box
 p_valores_box <- tibble(
   lag = 1:24, 
-  p_valores = sapply(1:24, function(i) Box.test(r1, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:24, function(i) Box.test(r2, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de autocorrelación
@@ -199,7 +268,8 @@ p_valores_box %>%
   theme_bw()
 
 ## Test de normalidad de Shapiro-Wilks
-shapiro.test(r1)
+shapiro.test(r2)
+JarqueBera.test(r2)
 ```
 
 
@@ -207,7 +277,10 @@ shapiro.test(r1)
 # MODELO CON INTERVENCIONES SELECCIONADAS POR TSO
 
 # Identificación y estimación -----------------------------------------------------------
-modelo_tso <- tso(manzana_train)
+modelo_tso <- tso(manzana_train, types = c("TC", "AO"))
+
+
+plot(modelo_tso)
 
 # Diagnóstico ---------------------------------------------------------------------------
 
@@ -216,10 +289,16 @@ r3 <- residuals(modelo_tso$fit)
 ## Gráfico de los residuos: los outliers siguen causando problemas con la normalidad
 autoplot(r3)
 
+
+ggAcf(r3)
+ggAcf(r3, type = "partial")
+
+
+
 ## Prueba de Ljung-Box
 p_valores_box_tso <- tibble(
-  lag = 1:24, 
-  p_valores = sapply(1:24, function(i) Box.test(r3, lag = i, type = "Ljung-Box")$p.value)
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r3, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de no autocorrelación
@@ -230,8 +309,11 @@ p_valores_box_tso %>%
 
 ## Test de normalidad de Shapiro-Wilks
 shapiro.test(r3)
+JarqueBera.test(r3)
 
 ## Se sigue rechazando la normalidad
+
+
 ```
 
 
@@ -255,8 +337,8 @@ autoplot(r4)
 
 ## Prueba de Ljung-Box
 p_valores_box_clean <- tibble(
-  lag = 1:24, 
-  p_valores = sapply(1:24, function(i) Box.test(r4, lag = i, type = "Ljung-Box")$p.value)
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r4, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de no autocorrelación
@@ -267,14 +349,47 @@ p_valores_box_clean %>%
 
 ## Test de normalidad de Shapiro-Wilks
 shapiro.test(r4)
+JarqueBera.test(r4)
+
 
 ## Se rechaza la hipótesis nula de normalidad
 
 ```
 
 
+```{r}
+# TBATS
+modelo_tbats <- tbats(manzana_train)
+
+r_tbats <- residuals(modelo_tbats)
+
+## Gráfico de los residuos: los outliers causarán problemas con la normalidad
+autoplot(r_tbats)
+
+## Prueba de Ljung-Box
+p_valores_box_tbats <- tibble(
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r_tbats, lag = i, type = "Ljung-Box")$p.value)
+  )
+
+## No se rechaza la hipótesis nula de autocorrelación
+
+p_valores_box_tbats %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw()
+
+## Test de normalidad de Shapiro-Wilks y Jarque-Bera
+shapiro.test(r_tbats)
+JarqueBera.test(r_tbats)
+
+## Se rechaza la hipótesis nula de normalidad
+```
 
 
+```{r}
+# ETS
+```
 
 
 
