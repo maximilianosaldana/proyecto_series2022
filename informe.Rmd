@@ -103,8 +103,8 @@ autoplot(manzana_train) +
 ```{r modelo1}
 # MODELO IDENTIFICACIÓN MANUAL
 
-## La transformación logarítmica no sería apropiada acá: la serie no aumenta en varianza con un aumento de media
-## y el lambda de la transformación Box-Cox es != 0
+# La transformación logarítmica no sería apropiada acá: la serie no aumenta en varianza con un aumento de media
+# y el lambda de la transformación Box-Cox es != 0
 BoxCox.lambda(manzana_train)
 
 # Autocorrelación, serie original
@@ -113,8 +113,8 @@ plot_acf1 <- autoplot(acf1) +
   labs(title = NULL) +
   theme_bw()
 
-## Parecería que hay un decaimiento exponencial, pero en torno al lag 24 (2 años) vuelven a 
-## haber autocorrelaciones significativas
+# Parecería que hay un decaimiento exponencial, pero en torno al lag 24 (2 años) vuelven a 
+# haber autocorrelaciones significativas
 
 # Autocorrelación parcial, serie original
 pacf1 <- ggAcf(manzana_train, type = "partial", plot = FALSE,lag = 56)
@@ -124,7 +124,7 @@ plot_pacf1 <- autoplot(pacf1) +
 
 grid.arrange(plot_acf1, plot_pacf1)
 
-## En cualquier caso, estos gráficos no resultan definitivos para determinar si el proceso es trend stationary o difference stationary
+# En cualquier caso, estos gráficos no resultan definitivos para determinar si el proceso es trend stationary o difference stationary
 
 # Test de raices unitarias
 test_df_mod1 <- ur.df(manzana_train)
@@ -133,15 +133,15 @@ summary(test_df_mod1)
 test_pp_mod1 <- ur.pp(manzana_train)
 summary(test_pp_mod1)
 
-## No rechazamos la hipótesis nula de que hay una raíz unitaria, usando los dos tests
+# No rechazamos la hipótesis nula de que hay una raíz unitaria, usando los dos tests
 
-## Probamos con una primera diferencia
+# Probamos con una primera diferencia
 manzana_train_diff <- diff(manzana_train)
 
 autoplot(manzana_train_diff)
 
-## El problema va a estar con las caídas abruptas a comienzos de los años
-## En particular 2017 y 2021
+# El problema va a estar con las caídas abruptas a comienzos de los años
+# En particular 2017 y 2021
 
 # Autocorrelación
 acf1_diff <- ggAcf(manzana_train_diff, type = "correlation", plot = FALSE, lag = 36) 
@@ -157,7 +157,7 @@ plot_pacf1_diff <- autoplot(pacf1_diff) +
 
 grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 
-## Ahora queda el efecto del primer lag y del 24. En la PACF se aprecian autocorrelaciones positivas para los dos primeros lags
+# Ahora queda el efecto del primer lag y del 24. En la PACF se aprecian autocorrelaciones positivas para los dos primeros lags
 
 # Test de raices unitarias
 test_df_mod1_diff <- ur.df(manzana_train_diff)
@@ -166,90 +166,152 @@ summary(test_df_mod1_diff)
 
 test_pp_mod1_diff <- ur.pp(manzana_train_diff)
 summary(test_pp_mod1_diff)
-## Rechazamos la hipótesis de raíces unitarias
+# Rechazamos la hipótesis de raíces unitarias
 
 
-## Capaz se puede interpretar como un ARMA(2,1,1)(0,0,2)_12 
+# Capaz se puede interpretar como un ARMA(2,1,1)(0,0,2)_12 
 modelo1 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0))
 
 summary(modelo1)
 r1 <- residuals(modelo1)
 
-## Gráfico de los residuos: los outliers causarán problemas con la normalidad
+# Gráfico de los residuos: los outliers causarán problemas con la normalidad
 autoplot(r1)
 
-## Prueba de Ljung-Box
+# Prueba de Ljung-Box
 p_valores_box1 <- tibble(
   lag = 1:36, 
   p_valores = sapply(1:36, function(i) Box.test(r1, lag = i, type = "Ljung-Box")$p.value)
   )
 
-## No se rechaza la hipótesis nula de autocorrelación
+# No se rechaza la hipótesis nula de autocorrelación
 p_valores_box1 %>% 
   ggplot() +
   geom_point(aes(lag, p_valores))+
   theme_bw()
 
-## Test de normalidad de Shapiro-Wilks y Jarque-Bera
+# Test de normalidad de Shapiro-Wilks y Jarque-Bera
 shapiro.test(r1)
 JarqueBera.test(r1)
 
+# Se rechaza la hipótesis nula de normalidad,
+# Los outliers son los sospechosos de ser culpables de esto
+# Usamos el criterio estricto de Hyndman de que un atipico se aleja en 3*IQR del IQR 
 
-## Se rechaza la hipótesis nula de normalidad
+outliers1 <- r1[r1 < quantile(r1, 0.25) - 3*IQR(r1) | r1 > quantile(r1, 0.75) + 3*IQR(r1)]
+    
+outliers1_index <- which(r1 == outliers[1] | r1 == outliers[2])
 
 
-## El problema son los outliers de principio del año, capaz ts_clean?
+# Probamos con insertar dummies, atípico AO o TC
+# Se usan criterios de informacion para elegir el tipo
 
-manzana_train_diff_clean <- tsclean(manzana_train)
-
-autoplot(manzana_train_diff_clean)
-
-modelo1_clean <- Arima(manzana_train_diff, order = c(2, 0, 1), seasonal = c(0, 0, 2))
-
-r1_clean <- residuals(modelo1_clean)
-
-## Gráfico de los residuos: los outliers causarán problemas con la normalidad
-autoplot(r1_clean)
-
-## Prueba de Ljung-Box
-p_valores_box1_clean <- tibble(
-  lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r1_clean, lag = i, type = "Ljung-Box")$p.value)
+tipos_outliers <- list(
+  tc_tc = outliers(c("TC", "TC"), outliers1_index),
+  tc_ao = outliers(c("TC", "AO"), outliers1_index),
+  ao_ao = outliers(c("AO", "AO"), outliers1_index),
+  ao_tc = outliers(c("AO", "TC"), outliers1_index)
   )
 
-## No se rechaza la hipótesis nula de autocorrelación
-p_valores_box1_clean %>% 
+
+outliers_effect <- outliers.effects(tipos_outliers[[1]], n = length(manzana_train))
+
+modelo1_int <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0), xreg = outliers_effect)
+
+r1_int <- residuals(modelo1_int)
+
+autoplot(r1_int)
+
+# Tests de normalidad
+shapiro.test(r1_int)
+JarqueBera.test(r1_int)
+
+# Sigue habiendo un atipico fuerte!
+
+# Relajamos el criterio de outliers, porque sino no lo capta
+outliers1_int <- r1_int[r1_int < quantile(r1_int, 0.25) - 2.5*IQR(r1_int) | r1_int > quantile(r1_int, 0.75) + 2.5*IQR(r1_int)]
+    
+outliers1_int_index <- which(r1_int == outliers1_int[1])
+
+# Incluimos un AO
+tipos_outliers_int <- outliers(c("TC", "AO", "TC"), c(49,50,99))
+
+outliers_effect_int <- outliers.effects(tipos_outliers2, n = length(manzana_train))
+
+
+modelo1_int2 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0), xreg = outliers_effect_int)
+
+r1_int2 <- residuals(modelo1_int2)
+
+autoplot(r1_int2)
+
+# Graficamos el efecto
+outliers_effect_int_tbbl <- outliers_effect_int %>% 
+  as_tibble() %>% 
+  mutate(fecha = seq(as.Date("2013-01-01"), as.Date("2021-05-01"), by = "month"))
+
+(plot_outliers_effects1 <- outliers_effect_int_tbbl %>% 
   ggplot() +
-  geom_point(aes(lag, p_valores))+
+  geom_line(aes(x = fecha, y = TC49, color = "TC49")) +
+  geom_line(aes(x = fecha, y = AO50, color = "AO50")) +
+  geom_line(aes(x = fecha, y = TC99, color = "AO99")) +
+  labs(color = "Outlier", y = "Efecto", x = "Tiempo (Año)") +
+  theme_bw()) 
+
+# Tests de normalidad
+shapiro.test(r1_int2)
+JarqueBera.test(r1_int2)
+
+# No se rechaza la normalidad!
+
+## Prueba de Ljung-Box (por las dudas)
+p_valores_box1_int2 <- tibble(
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r1_int2, lag = i, type = "Ljung-Box")$p.value)
+  )
+
+# No se rechaza la hipótesis nula de autocorrelación al 5%
+p_valores_box1_int2 %>% 
+  ggplot(aes(lag, p_valores)) +
+  geom_hline(yintercept = 0.05, color = "red") +
+  geom_point()+
   theme_bw()
 
-## Test de normalidad de Shapiro-Wilks
-shapiro.test(r1_clean)
-JarqueBera.test(r1_clean)
+# Predicción 
 
-## Se rechaza la hipótesis nula de normalidad
+npred <- length(manzana_test)
+newxreg1 <- outliers.effects(tipos_outliers_int, n=length(manzana_train) + npred) 
+  
 
+outliers_pred1 <- newxreg1[(length(manzana)-npred+1):length(manzana),]
 
-# Probamos con insertar dummies
+prediccion1 <- forecast(modelo1_int2, h = 12, xreg = outliers_pred1, level = c(20, 40, 60, 80, 95))
 
+(plot_prediccion1 <- autoplot(prediccion1) + 
+    autolayer(manzana_test) +
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ARIMA(2,1,1)(2,0,0)[12]. Intervenido.",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
 
+# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
 
-
-
-
+medidas_error1 <- accuracy(prediccion1, manzana_test)
 ```
 
 
 
-
-
-```{r}
+```{r modelo2}
 # MODELO ELEGIDO MEDIANTE CRITERIOS DE INFORMACIÓN
 
-# Identificación y estimación ----------------------------------------
+# Identificación y estimación ------------------------------------------
 modelo2 <- auto.arima(manzana_train)
 
-# Diagnóstico -------------------------------------------------------
+# Diagnóstico ------------------------------------------------------------
 r2 <- residuals(modelo2)
 
 ## Gráfico de los residuos: los outliers causarán problemas con la normalidad
@@ -257,8 +319,8 @@ autoplot(r2)
 
 ## Prueba de Ljung-Box
 p_valores_box <- tibble(
-  lag = 1:24, 
-  p_valores = sapply(1:24, function(i) Box.test(r2, lag = i, type = "Ljung-Box")$p.value)
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r2, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de autocorrelación
@@ -270,10 +332,114 @@ p_valores_box %>%
 ## Test de normalidad de Shapiro-Wilks
 shapiro.test(r2)
 JarqueBera.test(r2)
+
+# Vemos cuales son los atípicos
+
+outliers2 <- r2[r2 < quantile(r2, 0.25) - 3*IQR(r2) | r2 > quantile(r2, 0.75) + 3*IQR(r2)]
+outliers2_index <- which(r2 == outliers2[1] | r2 == outliers2[2])
+
+tipos_outliers2 <- list(
+  tc_tc = outliers(c("TC", "TC"), outliers2_index),
+  tc_ao = outliers(c("TC", "AO"), outliers2_index),
+  ao_ao = outliers(c("AO", "AO"), outliers2_index),
+  ao_tc = outliers(c("AO", "TC"), outliers2_index)
+  )
+
+# Se aumenta el delta porque el outlier de 2017 tiene un efecto fuerte
+outliers_effect2 <- outliers.effects(tipos_outliers[[1]], n = length(manzana_train), delta = 0.9)
+
+modelo2_int <- Arima(manzana_train, order = c(0, 1, 2), seasonal = c(0, 0, 2), xreg = outliers_effect2)
+
+r2_int <- residuals(modelo2_int)
+
+autoplot(r2_int)
+
+# Tests de normalidad
+shapiro.test(r2_int)
+JarqueBera.test(r2_int)
+
+# Se rechaza la normalidad todavía, volvemos a intervenir
+
+# Criterio de outliers de Hyndman
+outliers2_int <- r2_int[r2_int < quantile(r2_int, 0.25) - 3*IQR(r2_int) | r2_int > quantile(r2_int, 0.75) + 3*IQR(r2_int)]
+    
+outliers2_int_index <- which(r2_int == outliers2_int[1] | r2_int == outliers2_int[2])
+
+# Incluimos un AO
+tipos_outliers2_int <- outliers(c("TC", "AO", "TC"), c(49,50,99))
+
+outliers_effect2_int <- outliers.effects(tipos_outliers2_int, n = length(manzana_train))
+
+
+modelo2_int2 <- Arima(manzana_train, order = c(0, 1, 2), seasonal = c(0, 0, 2), xreg = outliers_effect2_int)
+
+r2_int2 <- residuals(modelo2_int2)
+
+autoplot(r1_int2)
+
+# Graficamos el efecto
+outliers_effect_int_tbbl <- outliers_effect_int %>% 
+  as_tibble() %>% 
+  mutate(fecha = seq(as.Date("2013-01-01"), as.Date("2021-05-01"), by = "month"))
+
+(plot_outliers_effects1 <- outliers_effect_int_tbbl %>% 
+  ggplot() +
+  geom_line(aes(x = fecha, y = TC49, color = "TC49")) +
+  geom_line(aes(x = fecha, y = AO50, color = "AO50")) +
+  geom_line(aes(x = fecha, y = TC99, color = "AO99")) +
+  labs(color = "Outlier", y = "Efecto", x = "Tiempo (Año)") +
+  theme_bw()) 
+
+# Tests de normalidad
+shapiro.test(r2_int2)
+JarqueBera.test(r2_int2)
+
+# No se rechaza la normalidad!
+
+## Prueba de Ljung-Box (por las dudas)
+p_valores_box2_int2 <- tibble(
+  lag = 1:36, 
+  p_valores = sapply(1:36, function(i) Box.test(r2_int2, lag = i, type = "Ljung-Box")$p.value)
+  )
+
+# No se rechaza la hipótesis nula de autocorrelación al 5%
+p_valores_box2_int2 %>% 
+  ggplot(aes(lag, p_valores)) +
+  geom_hline(yintercept = 0.05, color = "red") +
+  geom_point()+
+  theme_bw()
+
+# Predicción 
+
+newxreg2 <- outliers.effects(tipos_outliers2_int, n=length(manzana_train) + npred) 
+  
+
+outliers_pred2 <- newxreg2[(length(manzana)-npred+1):length(manzana),]
+
+prediccion2 <- forecast(modelo2_int2, h = 12, xreg = outliers_pred2, level = c(20, 40, 60, 80, 95))
+
+(plot_prediccion2 <- autoplot(prediccion2) + 
+    autolayer(manzana_test) +
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ARIMA(0,1,2)(0,0,2)[12]. Intervenido.",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
+
+# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
+medidas_error2 <- accuracy(prediccion2, manzana_test)
+
 ```
 
 
-```{r}
+
+
+
+
+```{r modelo3}
 # MODELO CON INTERVENCIONES SELECCIONADAS POR TSO
 
 # Identificación y estimación -----------------------------------------------------------
@@ -307,17 +473,42 @@ p_valores_box_tso %>%
   geom_point(aes(lag, p_valores))+
   theme_bw()
 
-## Test de normalidad de Shapiro-Wilks
+# Test de normalidad de Shapiro-Wilks
 shapiro.test(r_tso)
 JarqueBera.test(r_tso)
 
-## No se rechaza la hipótesis nula de normalidad
+# No se rechaza la hipótesis nula de normalidad
 
 
+# Pasamos a la prediccion
+npred <- length(manzana_test)
+
+newxreg_tso <- outliers.effects(modelo_tso$outliers, n=length(manzana_train)+npred)
+
+outliers_pred3 <- newxreg_tso[(length(manzana)-npred+1):length(manzana),]
+
+prediccion_tso <- forecast(modelo_tso$fit, h = npred, xreg = outliers_pred3, level = c(20, 40, 60, 80, 95))
+
+
+(plot_prediccion_tso <- autoplot(prediccion_tso) + 
+    autolayer(manzana_test) +
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ARIMA(1,0,1)(1,1,0)[12]. Intervenido.",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
+
+# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
+medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 ```
 
 
-```{r}
+
+
+```{r modelo4}
 # MODELO CON INTERVENCIONES OBTENIDAS POR METODOS DEL PAQUETE TSOUTLIERS
 
 ## Se identifican los outliers y se sustituyen con una interpolación lineal
@@ -352,43 +543,50 @@ shapiro.test(r_clean)
 JarqueBera.test(r_clean)
 
 
-## Se rechaza la hipótesis nula de normalidad
+## Se rechaza la hipótesis nula de normalidad, usamos bootstrap para los intervalos.
+
+
+prediccion_clean <- forecast(modelo_clean, bootstrap=TRUE, h=length(manzana_test), level = c(20, 40, 60, 80, 95))
+
+
+(plot_prediccion_clean <- autoplot(prediccion_clean) +
+    autolayer(manzana_test) +
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ARIMA(0,0,1)(2,0,0)[12]. Intervenido.",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
+
+
+medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 
 ```
 
 
-```{r}
-# TBATS
-modelo_tbats <- tbats(manzana_train)
 
-r_tbats <- residuals(modelo_tbats)
-
-## Gráfico de los residuos: los outliers causarán problemas con la normalidad
-autoplot(r_tbats)
-
-## Prueba de Ljung-Box
-p_valores_box_tbats <- tibble(
-  lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r_tbats, lag = i, type = "Ljung-Box")$p.value)
-  )
-
-## No se rechaza la hipótesis nula de autocorrelación
-
-p_valores_box_tbats %>% 
-  ggplot() +
-  geom_point(aes(lag, p_valores))+
-  theme_bw()
-
-## Test de normalidad de Shapiro-Wilks y Jarque-Bera
-shapiro.test(r_tbats)
-JarqueBera.test(r_tbats)
-
-## Se rechaza la hipótesis nula de normalidad
-```
-
-
-```{r}
+```{r modelo5}
 # ETS
+modelo_ets <- ets(manzana_train)
+
+prediccion_ets <- forecast(modelo_ets, h = 12)
+
+(plot_prediccion_ets <- prediccion_ets %>% 
+  autoplot() +
+  autolayer(manzana_test)+
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ETS(M, N, A)[12].",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
+
+medidas_error_ets <- accuracy(prediccion_ets, manzana_test)
+
 ```
 
 
@@ -459,31 +657,5 @@ Realizaremos predicción para los siguientes modelos, que son los que mejor cump
 * **modelo_tbats:** Modelo TBATS (explicar más). Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad (la única hipótesis nula que no se rechaza en este sentido es la de asimetría).
 
 
-```{r}
-npred <- length(manzana_test)
-
-newxreg <- outliers.effects(modelo_tso$outliers, n=length(manzana_train)+npred)
-newxreg <- ts(newxreg[-seq_along(manzana_train),], start = c(2021, 6))
-
-pred_tso <- predict(modelo_tso$fit, n.ahead=npred, newxreg=newxreg)
-
-#Serie con valores originales de train + predicción
-aux <- ts(c(manzana_train, pred_tso$pred), start = c(2013, 1), end = c(2022, 5) , frequency = 12) #Ver una forma menos manual de hacer esto
-
-autoplot(aux) +
-    autolayer(manzana_test) #Ver una mejor forma de graficar esto
-```
-
-```{r}
-pred_clean <- forecast(modelo_clean, bootstrap=TRUE, h=length(manzana_test))
-autoplot(pred_clean) +
-    autolayer(manzana_test)
-```
-
-```{r}
-pred_tbats <- forecast(modelo_tbats, bootstrap=TRUE, h=length(manzana_test))
-autoplot(pred_tbats) +
-    autolayer(manzana_test)
-```
 
 # Conclusiones
