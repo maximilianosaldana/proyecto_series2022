@@ -284,21 +284,21 @@ plot(modelo_tso)
 
 # Diagnóstico ---------------------------------------------------------------------------
 
-r3 <- residuals(modelo_tso$fit)
+r_tso <- residuals(modelo_tso$fit)
 
 ## Gráfico de los residuos: los outliers siguen causando problemas con la normalidad
-autoplot(r3)
+autoplot(r_tso)
 
 
-ggAcf(r3)
-ggAcf(r3, type = "partial")
+ggAcf(r_tso)
+ggAcf(r_tso, type = "partial")
 
 
 
 ## Prueba de Ljung-Box
 p_valores_box_tso <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r3, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r_tso, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de no autocorrelación
@@ -308,10 +308,10 @@ p_valores_box_tso %>%
   theme_bw()
 
 ## Test de normalidad de Shapiro-Wilks
-shapiro.test(r3)
-JarqueBera.test(r3)
+shapiro.test(r_tso)
+JarqueBera.test(r_tso)
 
-## Se sigue rechazando la normalidad
+## No se rechaza la hipótesis nula de normalidad
 
 
 ```
@@ -330,15 +330,15 @@ modelo_clean <- auto.arima(manzana_train_clean)
 
 # Diagnóstico ---------------------------------------------------------------------------
 
-r4 <- residuals(modelo_clean)
+r_clean <- residuals(modelo_clean)
 
 ## Gráfico de los residuos: los outliers todavía presentes
-autoplot(r4)
+autoplot(r_clean)
 
 ## Prueba de Ljung-Box
 p_valores_box_clean <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r4, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r_clean, lag = i, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de no autocorrelación
@@ -348,8 +348,8 @@ p_valores_box_clean %>%
   theme_bw()
 
 ## Test de normalidad de Shapiro-Wilks
-shapiro.test(r4)
-JarqueBera.test(r4)
+shapiro.test(r_clean)
+JarqueBera.test(r_clean)
 
 
 ## Se rechaza la hipótesis nula de normalidad
@@ -450,11 +450,40 @@ Posteriormente se deberá poner a prueba la presencia de otros atípicos.
 
 ## Predicción
 
+Realizaremos predicción para los siguientes modelos, que son los que mejor cumplen los supuestos:
+
+* **modelo_tso:** Modelo intervenido con el procedimiento automático de detección de outliers del paquete _tso_. Cumple tanto el supuesto de no autocorrelación de los residuos como el supuesto de normalidad.
+
+* **modelo_clean:** Modelo intervenido con por métodos del paquete _tsoutliers_, que reemplaza los mismos a través de interpolación lineal. Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad.
+
+* **modelo_tbats:** Modelo TBATS (explicar más). Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad (la única hipótesis nula que no se rechaza en este sentido es la de asimetría).
 
 
+```{r}
+npred <- length(manzana_test)
 
+newxreg <- outliers.effects(modelo_tso$outliers, n=length(manzana_train)+npred)
+newxreg <- ts(newxreg[-seq_along(manzana_train),], start = c(2021, 6))
 
+pred_tso <- predict(modelo_tso$fit, n.ahead=npred, newxreg=newxreg)
 
+#Serie con valores originales de train + predicción
+aux <- ts(c(manzana_train, pred_tso$pred), start = c(2013, 1), end = c(2022, 5) , frequency = 12) #Ver una forma menos manual de hacer esto
 
+autoplot(aux) +
+    autolayer(manzana_test) #Ver una mejor forma de graficar esto
+```
+
+```{r}
+pred_clean <- forecast(modelo_clean, bootstrap=TRUE, h=length(manzana_test))
+autoplot(pred_clean) +
+    autolayer(manzana_test)
+```
+
+```{r}
+pred_tbats <- forecast(modelo_tbats, bootstrap=TRUE, h=length(manzana_test))
+autoplot(pred_tbats) +
+    autolayer(manzana_test)
+```
 
 # Conclusiones
