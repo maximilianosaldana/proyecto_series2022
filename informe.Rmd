@@ -92,9 +92,7 @@ Para ahondar en el análisis descriptivo se realiza la descomposición de la ser
 Se puede apreciar una marcada estacionalidad anual y en los últimos 6 años un ciclo corto que se repite cada dos años. La fuerza de la estacionalidad, definida como [@hyndman2018]:
 
 $$F_s = max\left(0, 1-\frac{Var(R_t)}{Var(R_t+ S_t)}\right)$$
-toma el valor 0.51 (entre más cercano a 1 más fuerte el componente).
-
-Esto refuerza la necesidad de considerar la estacionalidad a la hora de especificar un modelo. 
+toma el valor 0.51 (entre más cercano a 1 más fuerte el componente). Esto refuerza la necesidad de considerar la estacionalidad a la hora de especificar un modelo. 
 
 ```{r}
 # Fuerza de la estacionalidad
@@ -618,20 +616,35 @@ Donde el parámetro $\lambda$ se estima por máxima verosimilitud. En el caso de
 
 Como primer elemento a considerar en la identificación de un modelo ARIMA resultan útiles las funciones de autocorrelación y autocorrelación parcial. Al graficarlas en ellas se puede visualizar la estructura de dependencia temporal de la serie trabajada e indicios de la estacionariedad o ausencia de ella. La función de autocorrelación (ACF) se define como:
 
-$$\rho(t, t+j) = \frac{Cov(X_t, X_{t+j})}{\sigma_t\sigma_{t+j}}  $$
+$$\rho(t, t+j) = \frac{Cov(Y_t, Y_{t+j})}{\sigma_t\sigma_{t+j}}  $$
 
-Mientras que la función de autocorrelación parcial (PACF) es la autocorrelación entre  $X_t$ y $X_{t+j}$ una vez se quita el efecto de las correlaciones intermedias que hay entre ambas variables [@notas_series].
+Mientras que la función de autocorrelación parcial (PACF) es la autocorrelación entre  $Y_t$ y $Y_{t+j}$ una vez se quita el efecto de las correlaciones intermedias que hay entre ambas variables [@notas_series].
 
 Estas funciones se deben estimar a partir de los datos, obteniéndose la autocorrelación muestral. En la figura \@ref(fig:acf1) se presentan los primeros 72 valores de ambas funciones para la serie original de precios de manzana, junto con el intervalo de confianza de la prueba de hipótesis $H_0) \rho_j = 0$ vs $H_0) \rho_j \ne 0$. En la ACF se puede distinguir que las primeras 5 autocorrelaciones resultan significativas y también las que están en torno al lag 24 y entre los lags 36 y 48. Esto puede ser un indicio de estacionalidad anual o bianual.
 
 Por otro lado, en la PACF se aprecia que los valores para los primeros dos lags son significativamente distintos a 0. Esto puede ser un indicio de que hay una estructura autorregresiva en los datos.
 
+### Dominio de las frecuencias
 
 ```{r acf1, fig.cap="Funciones de autocorrelación y autocorrelación parcial muestrales de la serie de precios de manzana.", include = TRUE}
 grid.arrange(plot_acf1, plot_pacf1)
 ```
 
-## Tests de raíces unitarias
+Desde la perspectiva del dominio de las frecuencias de la serie se considera esta última en su expresión trigonométrica, mediante una suma ponderada de funciones periódicas coseno y seno. El espectro poblacional puede resultar de utilizad para observar la estructura de variabilidad de la serie, dado que el área por debajo del mismo es la variabilidad asociada a las frecuencias consideradas.
+
+En la figura \@ref(fig:espectro) se presenta la estimación no paramétrica del espectro poblacional de la serie de precios de manzana trabajada. En esta estimación se hace uso del periodograma muestral, que es la estimación del espectro poblacional a partir de las autocovarianzas muestrales y luego se realiza un promedio ponderado de sus valores mediante un _kernel_ a fines de suavizar el resultado, que en general resulta difícil de interpretar inicialmente. En este caso se pondera con el _kernel_ de Daniell modificado ponderando de a 3 valores del periodograma muestral 2 veces sucesivas. Se puede apreciar como las frecuencias menores, aquellas asociadas a periodos más largos (teniendo en cuenta que $p =2\pi/w$, siendo $p$ el periodo y $w$ la frecuencia) son aquellas que acumulan mayor variabilidad. Esto puede considerarse como otro indicio de una dependencia temporal estacional entre las observaciones de la muestra.
+
+```{r espectro, includo = TRUE, fig.cap="Periodograma muestral, estimación no paramétrica. 3 spans aplicados 2 veces."}
+# Estimación del espectro.
+# Al agregar spans se está considerando la estimación no paramétrica.
+
+spectrum(manzana_train,  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro")
+
+# Que es la linea azul, un IC?
+```
+
+
+### Tests de raíces unitarias
 
 Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, cuenta con una raíz unitaria. En dicho caso el proceso es no estacionario la cual implica que no puede ser modelado en el marco de los ARMA. 
 
@@ -645,7 +658,7 @@ H_0) \rho = 1 \\
 H_1) \rho < 1 \\
 $$
 
-Empleando el estadístico $(\hat{\rho}-1)/\sigma_\hat{\rho}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller.
+Empleando el estadístico $(\hat{\rho} - 1) / \sigma_{\hat{\rho}}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller.
 
 El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
 
@@ -653,21 +666,37 @@ Por otro lado la propuesta de prueba de raíz unitaria de Phillip-Perron se basa
 
 Para la serie planteada, al observar los p-valores, ambos tests llevan a no rechazar la hipótesis de raíz unitaria al 95% de confianza. Esto lleva a concluir que una primera diferencia resulta necesaria para llevar la serie a la estacionariedad.
 
-```{r acf2}
+```{r acf2, include = TRUE, fig.cap= "Autocorrelograma y autocorrelograma parcial de la serie de primeras difernecias de precios de manzana."}
 grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 ```
 
 Observando los nuevos autocorrelogramas se puede notar como el primer valor del ACF resulta significativamente distinto a 0 (lo cual puede ser indicio de un componente de medias móviles de orden 1) y lo mismo se da para los valores en torno al lag 24 y 48 (indicio de un componente estacional autorregresivo de orden 2). Esto último vuelve a indicar la presencia de una estructura de dependencia estacional. Por otro lado, en la PACF, se aprecia que solo los dos primeros valores son significativos, lo cual puede indicar cierta estructura autorregresiva, posiblemente de orden 2. A pesar de esto, hay que tener en cuenta que al tratar de identificar el orden de un proceso ARIMA mediante la FAC y PACF los elementos del procesos comienzan a mezclarse y no resulta tan claro la cantidad de parámetros a elegir. 
 
-Teniendo esto en cuenta, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$
+Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$, es decir, un modelo de la forma:
 
+$$\Phi_2(L^{12})\phi_2(L)\Delta^1 Y_t = \theta_1(L)\varepsilon_t$$
+Donde:
 
+$$\Phi_2(L^{12}) = 1-\Phi_1L^{12}-\Phi_2 L^{24}$$
 
+$$\phi_2(L) = 1-\phi_1 L-\phi_2 L^{2}$$
 
+$$\Delta^1 = 1-L$$
 
+$$\theta_1(L) = 1-\theta_1L$$
 
+$$\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2) $$
 
+### Selección mediante criterios de información
 
+Una forma alternativa de elegir la especificación del modelo, esto es, la cantidad de parámetros y de diferencias, es mediante los criterios de información. Con estos criterios se busca elegir entre una selección de modelos aquel con una mayor verosimilitud, penalizando por la cantidad de parámetros que tenga. 
+
+Uno de los más empleados y en particular el que se considera en la función _auto.arima()_ empleada para la estimación es el criterio de información de Akaike corregido (AICc). Su fórmula para un modelo es:
+
+$$AICc = T\log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
+Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_{MV}$ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
+
+El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza multiples tests de raíz unitaria).
 
 
 
