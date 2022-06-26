@@ -44,7 +44,6 @@ manzana <- ts(precios_manzana$precio_promedio, start = c(2013, 1), end = c(2022,
 ```
 
 
-
 # Resumen ejecutivo
 
 # Análisis descriptivo
@@ -77,14 +76,29 @@ grid.arrange(a, b, nrow = 1)
 
 
 
-
-```{r descomp}
+```{r descomp, include=TRUE}
 # Ver si incluir y en qué parte
 
 descomp <- stl(manzana, s.window = 13)
 
 autoplot(descomp) +
   theme_bw()
+```
+  
+Para ahondar en el análisis descriptivo se realiza la descomposición de la serie en tendencia/ciclo, estacionalidad y componente irregular. En la figura \@ref(fig:descomp) se presentan las series de los componentes resultado de una descomposición mediante _STL_ (Seasonal Trend Descomposition using LOESS) por separado. 
+
+<!-- Explicar STL -->
+
+Se puede apreciar una marcada estacionalidad anual y en los últimos 6 años un ciclo corto que se repite cada dos años. La fuerza de la estacionalidad, definida como [@hyndman2018]:
+
+$$F_s = max\left(0, 1-\frac{Var(R_t)}{Var(R_t+ S_t)}\right)$$
+toma el valor 0.51 (entre más cercano a 1 más fuerte el componente).
+
+Esto refuerza la necesidad de considerar la estacionalidad a la hora de especificar un modelo. 
+
+```{r}
+# Fuerza de la estacionalidad
+1- var(descomp$time.series[,3])/var(descomp$time.series[,3]+ descomp$time.series[,1])
 ```
 
 
@@ -99,7 +113,6 @@ autoplot(manzana_train) +
   theme_bw()
 ```
 
-
 ```{r modelo1}
 # MODELO IDENTIFICACIÓN MANUAL
 
@@ -108,7 +121,7 @@ autoplot(manzana_train) +
 BoxCox.lambda(manzana_train)
 
 # Autocorrelación, serie original
-acf1 <- ggAcf(manzana_train, type = "correlation", plot = FALSE, lag = 56) 
+acf1 <- ggAcf(manzana_train, type = "correlation", plot = FALSE, lag = 72) 
 plot_acf1 <- autoplot(acf1) +
   labs(title = NULL) +
   theme_bw()
@@ -117,7 +130,7 @@ plot_acf1 <- autoplot(acf1) +
 # haber autocorrelaciones significativas
 
 # Autocorrelación parcial, serie original
-pacf1 <- ggAcf(manzana_train, type = "partial", plot = FALSE,lag = 56)
+pacf1 <- ggAcf(manzana_train, type = "partial", plot = FALSE,lag = 72)
 plot_pacf1 <- autoplot(pacf1) +
   labs(title = NULL) +
   theme_bw()
@@ -144,13 +157,13 @@ autoplot(manzana_train_diff)
 # En particular 2017 y 2021
 
 # Autocorrelación
-acf1_diff <- ggAcf(manzana_train_diff, type = "correlation", plot = FALSE, lag = 36) 
+acf1_diff <- ggAcf(manzana_train_diff, type = "correlation", plot = FALSE, lag = 72) 
 plot_acf1_diff <- autoplot(acf1_diff) +
   labs(title = NULL) +
   theme_bw()
 
 # Autocorrelación parcial, serie diferenciada
-pacf1_diff <- ggAcf(manzana_train_diff, type = "partial", plot = FALSE,lag = 36)
+pacf1_diff <- ggAcf(manzana_train_diff, type = "partial", plot = FALSE,lag = 72)
 plot_pacf1_diff <- autoplot(pacf1_diff) +
   labs(title = NULL) +
   theme_bw()
@@ -198,9 +211,9 @@ JarqueBera.test(r1)
 # Los outliers son los sospechosos de ser culpables de esto
 # Usamos el criterio estricto de Hyndman de que un atipico se aleja en 3*IQR del IQR 
 
-outliers1 <- r1[r1 < quantile(r1, 0.25) - 3*IQR(r1) | r1 > quantile(r1, 0.75) + 3*IQR(r1)]
+outliers1 <- r1[(r1 < quantile(r1, 0.25) - 3*IQR(r1)) | (r1 > quantile(r1, 0.75) + 3*IQR(r1))]
     
-outliers1_index <- which(r1 == outliers[1] | r1 == outliers[2])
+outliers1_index <- which(r1 == outliers1[1] | r1 == outliers1[2])
 
 
 # Probamos con insertar dummies, atípico AO o TC
@@ -236,7 +249,7 @@ outliers1_int_index <- which(r1_int == outliers1_int[1])
 # Incluimos un AO
 tipos_outliers_int <- outliers(c("TC", "AO", "TC"), c(49,50,99))
 
-outliers_effect_int <- outliers.effects(tipos_outliers2, n = length(manzana_train))
+outliers_effect_int <- outliers.effects(tipos_outliers_int, n = length(manzana_train))
 
 
 modelo1_int2 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0), xreg = outliers_effect_int)
@@ -302,8 +315,6 @@ prediccion1 <- forecast(modelo1_int2, h = 12, xreg = outliers_pred1, level = c(2
 
 medidas_error1 <- accuracy(prediccion1, manzana_test)
 ```
-
-
 
 ```{r modelo2}
 # MODELO ELEGIDO MEDIANTE CRITERIOS DE INFORMACIÓN
@@ -434,11 +445,6 @@ medidas_error2 <- accuracy(prediccion2, manzana_test)
 
 ```
 
-
-
-
-
-
 ```{r modelo3}
 # MODELO CON INTERVENCIONES SELECCIONADAS POR TSO
 
@@ -505,9 +511,6 @@ prediccion_tso <- forecast(modelo_tso$fit, h = npred, xreg = outliers_pred3, lev
 medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 ```
 
-
-
-
 ```{r modelo4}
 # MODELO CON INTERVENCIONES OBTENIDAS POR METODOS DEL PAQUETE TSOUTLIERS
 
@@ -520,7 +523,6 @@ autoplot(manzana_train_clean)
 modelo_clean <- auto.arima(manzana_train_clean)
 
 # Diagnóstico ---------------------------------------------------------------------------
-
 r_clean <- residuals(modelo_clean)
 
 ## Gráfico de los residuos: los outliers todavía presentes
@@ -565,13 +567,11 @@ medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 
 ```
 
-
-
 ```{r modelo5}
 # ETS
 modelo_ets <- ets(manzana_train)
 
-prediccion_ets <- forecast(modelo_ets, h = 12)
+prediccion_ets <- forecast(modelo_ets, h = 12, level = c(20, 40, 60, 80, 95))
 
 (plot_prediccion_ets <- prediccion_ets %>% 
   autoplot() +
@@ -589,9 +589,9 @@ medidas_error_ets <- accuracy(prediccion_ets, manzana_test)
 
 ```
 
-
-
-
+```{r modelo6}
+# Modelo de espacio estado (estructural) - EXTRA SI DA EL TIEMPO
+```
 
 
 <!-- Desarrollo del informe de acá en adelante -->
@@ -600,13 +600,9 @@ medidas_error_ets <- accuracy(prediccion_ets, manzana_test)
 
 Resulta de interés que el modelo ajustado a la serie sea de utilidad para la predicción. Para poder evaluar la calidad de las predicciones, una manera que busca replicar el proceso de obtención de nuevos datos es dividir la serie en una muestra de entrenamiento y una de prueba. La primera se emplea para ajustar el modelo, a partir del cual se realizarán las predicciones. Se dejan las últimas 12 observaciones para la muestra de prueba, que son los precios que van desde junio de 2021 a mayo de 2022. Debe tenerse en cuenta que el periodo del final de la muestra de entrenamiento y también la muestra de prueba están enmarcados en el contexto de gran incertidumbre que presenta la pandemia, por lo que deberá tenerse especial cuidado con el tratamiento de atípicos y las conclusiones que se tomen sobre las predicciones.
 
-
-
 ## Identificación
 
-
-### Autocorrelación y autocorrelación parcial
-
+La primera fase para el modelado ARIMA de una serie de tiempo en el marco de la metodología de Box-Cox es la identificación del modelo, que consiste en determinar en un principio en detectar la estructura de autocorrelación, la cantidad de parámetros con la que contará la especificación, si la serie necesita diferenciación y si resultará necesaria alguna otra transformación. 
 
 ### Transformación logarítimica
 
@@ -618,19 +614,53 @@ $$y_t = \begin{cases} \frac{x_t - 1}{\lambda} \,\,\, si \,\,\, \lambda \ne 0 \\ 
 
 Donde el parámetro $\lambda$ se estima por máxima verosimilitud. En el caso de la serie planteada, dicho parámetro toma el valor -0.59, por lo que la transformación logarítmica no resulta adecuada.
 
+### Autocorrelación y autocorrelación parcial
+
+Como primer elemento a considerar en la identificación de un modelo ARIMA resultan útiles las funciones de autocorrelación y autocorrelación parcial. Al graficarlas en ellas se puede visualizar la estructura de dependencia temporal de la serie trabajada e indicios de la estacionariedad o ausencia de ella. La función de autocorrelación (ACF) se define como:
+
+$$\rho(t, t+j) = \frac{Cov(X_t, X_{t+j})}{\sigma_t\sigma_{t+j}}  $$
+
+Mientras que la función de autocorrelación parcial (PACF) es la autocorrelación entre  $X_t$ y $X_{t+j}$ una vez se quita el efecto de las correlaciones intermedias que hay entre ambas variables [@notas_series].
+
+Estas funciones se deben estimar a partir de los datos, obteniéndose la autocorrelación muestral. En la figura \@ref(fig:acf1) se presentan los primeros 72 valores de ambas funciones para la serie original de precios de manzana, junto con el intervalo de confianza de la prueba de hipótesis $H_0) \rho_j = 0$ vs $H_0) \rho_j \ne 0$. En la ACF se puede distinguir que las primeras 5 autocorrelaciones resultan significativas y también las que están en torno al lag 24 y entre los lags 36 y 48. Esto puede ser un indicio de estacionalidad anual o bianual.
+
+Por otro lado, en la PACF se aprecia que los valores para los primeros dos lags son significativamente distintos a 0. Esto puede ser un indicio de que hay una estructura autorregresiva en los datos.
 
 
+```{r acf1, fig.cap="Funciones de autocorrelación y autocorrelación parcial muestrales de la serie de precios de manzana.", include = TRUE}
+grid.arrange(plot_acf1, plot_pacf1)
+```
 
-### Atípicos: La pandemia
+## Tests de raíces unitarias
 
-Como se mencionó anteriormente, a simple vista es posible identificar que la pandemia de Coronavirus tuvo un impacto sobre los precios, así que esto deberá ser incluido en la modelización cuanto antes. Una manera de tener en cuenta este efecto atípico es considerar que hay un cambio transitorio (TC por sus siglas en inglés), un suceso que tiene un efecto que perdura en la serie pero no es permanente.
+Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, cuenta con una raíz unitaria. En dicho caso el proceso es no estacionario la cual implica que no puede ser modelado en el marco de los ARMA. 
 
-Posteriormente se deberá poner a prueba la presencia de otros atípicos.
+Hay múltiples pruebas de hipótesis que han sido desarrolladas con el propósito de identificar raíces unitarias. Dos de ellos son el de Dickey-Fuller aumentado y el de Phillips-Perron. En el caso del primero se especifica el proceso proceso estocástico subyacente como:
 
+$$Y_t = \rho Y_{t-1} + \varepsilon_t, \,\,\,\, \varepsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)$$
+Y se contrasta:
 
+$$
+H_0) \rho = 1 \\
+H_1) \rho < 1 \\
+$$
 
+Empleando el estadístico $(\hat{\rho}-1)/\sigma_\hat{\rho}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller.
 
-### Descomposición
+El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
+
+Por otro lado la propuesta de prueba de raíz unitaria de Phillip-Perron se basa en la de Dickey y Fuller, pero además los compatibilizan con la presencia de heteroscedasticidad y/o autocorrelación de los errores.
+
+Para la serie planteada, al observar los p-valores, ambos tests llevan a no rechazar la hipótesis de raíz unitaria al 95% de confianza. Esto lleva a concluir que una primera diferencia resulta necesaria para llevar la serie a la estacionariedad.
+
+```{r acf2}
+grid.arrange(plot_acf1_diff, plot_pacf1_diff)
+```
+
+Observando los nuevos autocorrelogramas se puede notar como el primer valor del ACF resulta significativamente distinto a 0 (lo cual puede ser indicio de un componente de medias móviles de orden 1) y lo mismo se da para los valores en torno al lag 24 y 48 (indicio de un componente estacional autorregresivo de orden 2). Esto último vuelve a indicar la presencia de una estructura de dependencia estacional. Por otro lado, en la PACF, se aprecia que solo los dos primeros valores son significativos, lo cual puede indicar cierta estructura autorregresiva, posiblemente de orden 2. A pesar de esto, hay que tener en cuenta que al tratar de identificar el orden de un proceso ARIMA mediante la FAC y PACF los elementos del procesos comienzan a mezclarse y no resulta tan claro la cantidad de parámetros a elegir. 
+
+Teniendo esto en cuenta, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$
+
 
 
 
@@ -645,6 +675,13 @@ Posteriormente se deberá poner a prueba la presencia de otros atípicos.
 
 
 ## Diagnóstico
+
+### Atípicos: La pandemia
+
+Como se mencionó anteriormente, a simple vista es posible identificar que la pandemia de Coronavirus tuvo un impacto sobre los precios, así que esto deberá ser incluido en la modelización cuanto antes. Una manera de tener en cuenta este efecto atípico es considerar que hay un cambio transitorio (TC por sus siglas en inglés), un suceso que tiene un efecto que perdura en la serie pero no es permanente.
+
+Posteriormente se deberá poner a prueba la presencia de otros atípicos.
+
 
 ## Predicción
 
