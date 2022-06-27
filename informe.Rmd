@@ -192,7 +192,7 @@ autoplot(r1)
 # Prueba de Ljung-Box
 p_valores_box1 <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r1, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r1, lag = i, fitdf = 5, type = "Ljung-Box")$p.value)
   )
 
 # No se rechaza la hipótesis nula de autocorrelación
@@ -278,7 +278,7 @@ JarqueBera.test(r1_int2)
 ## Prueba de Ljung-Box (por las dudas)
 p_valores_box1_int2 <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r1_int2, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r1_int2, lag = i, fitdf = 5,type = "Ljung-Box")$p.value)
   )
 
 # No se rechaza la hipótesis nula de autocorrelación al 5%
@@ -329,7 +329,7 @@ autoplot(r2)
 ## Prueba de Ljung-Box
 p_valores_box <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r2, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r2, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
   )
 
 ## No se rechaza la hipótesis nula de autocorrelación
@@ -408,7 +408,7 @@ JarqueBera.test(r2_int2)
 ## Prueba de Ljung-Box (por las dudas)
 p_valores_box2_int2 <- tibble(
   lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r2_int2, lag = i, type = "Ljung-Box")$p.value)
+  p_valores = sapply(1:36, function(i) Box.test(r2_int2, lag = i, fitdf = 4 , type = "Ljung-Box")$p.value)
   )
 
 # No se rechaza la hipótesis nula de autocorrelación al 5%
@@ -672,7 +672,7 @@ grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 
 Observando los nuevos autocorrelogramas se puede notar como el primer valor del ACF resulta significativamente distinto a 0 (lo cual puede ser indicio de un componente de medias móviles de orden 1) y lo mismo se da para los valores en torno al lag 24 y 48 (indicio de un componente estacional autorregresivo de orden 2). Esto último vuelve a indicar la presencia de una estructura de dependencia estacional. Por otro lado, en la PACF, se aprecia que solo los dos primeros valores son significativos, lo cual puede indicar cierta estructura autorregresiva, posiblemente de orden 2. A pesar de esto, hay que tener en cuenta que al tratar de identificar el orden de un proceso ARIMA mediante la FAC y PACF los elementos del procesos comienzan a mezclarse y no resulta tan claro la cantidad de parámetros a elegir. 
 
-Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$, es decir, un modelo de la forma:
+Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$ (en adelante "Modelo manual"), de la forma:
 
 $$\Phi_2(L^{12})\phi_2(L)\Delta^1 Y_t = \theta_1(L)\varepsilon_t$$
 Donde:
@@ -696,7 +696,7 @@ Uno de los más empleados y en particular el que se considera en la función _au
 $$AICc = T\log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
 Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_{MV}$ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
 
-El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza multiples tests de raíz unitaria).
+El modelo seleccionado mediante esta metodología (de ahora en adelante "Modelo AICc") resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza multiples tests de raíz unitaria).
 
 ## Estimación
 
@@ -704,7 +704,15 @@ Luego de haber identificado la especificación del modelo, el paso que sigue es 
 
 En particular, el método empleado es la estimacional máximo verosimil condicional, donde se supone que la primera observación de la serie es determinística y se maximiza la verosimilitud condicionada a esa observación, lo cual simplifica la operativa con las expresiones de las funciones y si el tamaño de muestra es razonablemente grande, la primera observación no tendrá gran efecto sobre la verosimilitud. 
 
+Los parámetros resultantes de la estimación inicial para el modelo manual son:
 
+* Parte autorregresiva: $\phi_1 = 0.951$ y $\phi_2 = -0.4463$.
+
+* Parte medias móviles: $\theta_1 = -0.4157$.
+
+* Parte autorregresiva estacional: $\Phi_1 = 0.102 $ y $\Phi_2 = 0.397$.
+
+* Varianza de las estimaciones: 
 
 ## Diagnóstico
 
