@@ -698,9 +698,12 @@ Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_
 
 El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza multiples tests de raíz unitaria).
 
-
-
 ## Estimación
+
+Luego de haber identificado la especificación del modelo, el paso que sigue es estimar sus parámetros, dado que no es posible conocer sus verdaderos valores al ser una construcción teórica. Para esto se recurre a la estimación por máxima verosimilitud, donde las estimaciones obtenidas son las que máximizan la probabilidad de que se haya obsevado la muestra con la que se cuenta. Es necesario asumir que los errores son gaussianos, un supuesto fuerte pero las estimaciones resultantes que emanen a partir de hacerlo serán razonables aunque no se cumpla [@hamilton_1994].
+
+En particular, el método empleado es la estimacional máximo verosimil condicional, donde se supone que la primera observación de la serie es determinística y se maximiza la verosimilitud condicionada a esa observación, lo cual simplifica la operativa con las expresiones de las funciones y si el tamaño de muestra es razonablemente grande, la primera observación no tendrá gran efecto sobre la verosimilitud. 
+
 
 
 ## Diagnóstico
