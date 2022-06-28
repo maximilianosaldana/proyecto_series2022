@@ -886,11 +886,11 @@ Los parámetros resultantes de la estimación para el _modelo manual_, son:
 
 ## Diagnóstico
 
-Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados sobre los residuos, sobre los cuales se sostienen los modelos. 
+Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados sobre los residuos, sobre los cuales se sostiene.  
 
 ### Media 0 de los residuos
 
-Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza.
+Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza, por lo que la evidencia está a favor de que su media incondicional es 0.
 
 ```{r}
 t.test(r1, mu = 0)
@@ -901,7 +901,7 @@ t.test(r1, mu = 0)
 ```
 
 
-### Incorrelación de los erores
+### Incorrelación de los errores
 
 Un supuesto cuyo cumplimiento es clave es la incorrelación de los errores, debido a que toda estructura de dependencia que no se esté captando en el modelo irá a parar a los residuos, el proxy con el que contamos para conocer el comportamiento de los errores. Si hay correlaciones entre los errores, la especificación del modelo todavía no capta el comportamiento de los datos.
 
@@ -924,11 +924,9 @@ p_valores_box1 %>%
 ```
 
 
-
-
 ### Homoscedasticidad
 
-Otro supuesto que se realizó fue sobre la varianza de los errores, la cual se desea constante. Para ponerlo a prueba se realiza el test desarrollado en @mcleod_li_1983. Es básicamente una prueba de Box-Ljung sobre los residuos al cuadrado del modelo. La hipótesis nula de esta prueba es la homoscedasticidad entre los k rezagos considerados.
+Otro supuesto que se realizó fue sobre la varianza de los errores, la cual se desea constante. Para ponerlo a prueba se realiza el test desarrollado en @mcleod_li_1983. Es básicamente una prueba de Box-Ljung sobre los residuos al cuadrado del modelo. La hipótesis nula de esta prueba es la homoscedasticidad entre los $k$ rezagos considerados.
 
 ```{r mcleodli, fig.cap = "P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE}
 McLeod.Li.test(modelo1, omit.initial = TRUE)
@@ -939,16 +937,18 @@ En la figura \@ref(fig:mcleodli) se presentan los valores de los p-valores de la
 
 ### Normalidad
 
+Finalmente, se evalúa si el modelo cumple el supuesto de que sus residuos tienen una distribución gaussiana. Este supuesto entra en juego en particular a la hora de calcular intervalos de predicción, que expresan la incertidumbre que se tiene respecto a la predicción puntual realizada. En caso de que se cumpla la normalidad los intervalos de confianza al $(1-\alpha)\%$ para la predicción a $s$ pasos podrán ser calculados con la fórmula:
 
+$$\hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{E[Y_t+s-E(Y_{t+s}|\varepsilon_t,\varepsilon_{t-1},\dots)]^2} = \hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{\sigma^2(1+\sum_{j=1}^{s-1}\Psi_j^2)}$$
 
+Donde $\hat{Y}_{t+s}$ es la predicción puntual, $z_{\alpha/2}$ es el percentil $\alpha/2$ de una distribución normal, $\sigma^2$ es la varianza de los errores y $\Psi_j$ es el j-ésimo parámetro de la representación $AR(\infty)$ del modelo (que siempre es posible hallarla cuando el modelo es estacionario por el teorema de Wold [@notas_series]).
 
+Fueron creadas múltiples formas de contrastar la normalidad, dos de ellas aplicadas en el presente trabajo son los contrastes de Jarque-Bera y de Shapiro-Wilk. Ambas contrastan las hipótests $H_0) \varepsilon_t \sim N(0, \sigma^2)$ versus $H_0) \varepsilon_t \nsim N(0, \sigma^2)$, pero difieren en la forma que lo hacen. En el caso de Jarque-Bera, se calculan los coeficientes de simetría y curtosis de los residuos para contrastarlos con los de una distribución normal teórica. Por otro lado, el test de Shapiro-Wilk fue desarrollado en @shapiro_wilk_1965 y sigue el enfoque del análisis de varianza y hace uso de un estadístico cuyos valores críticos son calculados mediante simulación Monte-Carlo.
 
+Estas pruebas son particularmente sensibles a la presencia de valores atípicos, que tienen una tendencia a alargar las colas de la distribución de los residuos y haciendo que estas consecuentemente se alejen de la normalidad. Como se mencionó anteriormente, es esperable que la pandemia de Coronavirus y su impacto económico causen comportamientos atípicos, por lo que también se espera el incumplimiento de este supuesto y la necesidad de intervenir la serie.
 
+En efecto, recurriendo a ambos contrastes se rechaza la hipótesis nula de normalidad al 95% de confianza, por lo que se recurrió a incorporar el efecto de los atípicos en el _modelo manual_. 
 
-
-<!-- Como se mencionó anteriormente, a simple vista es posible identificar que la pandemia de Coronavirus tuvo un impacto sobre los precios, así que esto deberá ser incluido en la modelización cuanto antes. Una manera de tener en cuenta este efecto atípico es considerar que hay un cambio transitorio (TC por sus siglas en inglés), un suceso que tiene un efecto que perdura en la serie pero no es permanente. -->
-
-<!-- Posteriormente se deberá poner a prueba la presencia de otros atípicos. -->
 
 
 # Predicción
