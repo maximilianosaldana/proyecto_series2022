@@ -8,7 +8,8 @@ output:
     number_sections: true
 header-includes:
   - \usepackage{float}
-  - \usepackage[spanish]{babel} 
+  - \usepackage[spanish]{babel}
+  - \usepackage{amsmath} 
 bibliography: bibliografia.bib
 editor_options: 
   chunk_output_type: console
@@ -32,6 +33,8 @@ library(readr)
 library(gridExtra)
 library(tsoutliers)
 library(urca)
+library(lmtest)
+library(TSA)
 ```
 
 ```{r datos}
@@ -181,10 +184,19 @@ summary(test_pp_mod1_diff)
 
 
 # Capaz se puede interpretar como un ARMA(2,1,1)(0,0,2)_12 
-modelo1 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0), fixed=c(NA, NA, NA, 0, NA))
-lmtest::coeftest(modelo1) #Los coef ar1 y ma1 son mayores a 1 y similares en magnitud, posible sobreparametrización, probamos sacar el ma1
+# modelo1 <- Arima(manzana_train, order = c(2, 1, 1), seasonal = c(2, 0, 0), fixed=c(NA, NA, NA, 0, NA))
+# lmtest::coeftest(modelo1) 
+#Los coef ar1 y ma1 son mayores a 1 y similares en magnitud, posible sobreparametrización, probamos sacar el ma1
 
-modelo1 <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA))
+# NOS QUEDAMOS CON ESTE EN LA SELECCION MANUAL:
+modelo1 <- Arima( 
+  manzana_train, 
+  order = c(2, 1, 0), 
+  seasonal = c(2, 0, 0), 
+  fixed=c(NA, NA, 0, NA)
+  ) 
+
+
 lmtest::coeftest(modelo1) 
 
 r1 <- residuals(modelo1)
@@ -206,6 +218,33 @@ p_valores_box1 %>%
   geom_hline(yintercept = 0.05, color="red") +
   xlab("Rezago") +
   ylab("p-valor")
+
+# Prueba de McLeod-Li de heteroscedasticidad (H0 es homoscedasticidad)
+
+# Se usa para detectar si se tendría que usar un ARCH/GARCH
+
+test_mcleodli1 <- McLeod.Li.test(modelo1)
+
+# Se rechaza la hipótesis nula de homoscedasticidad para los primeros 10 lags
+
+# Debería ser equivalente a un test de Box-Ljung aplicado a los residuos al cuadrado estandarizados
+
+p_valores_mlli1 <- tibble(
+  lag = 5:36, 
+  p_valores = sapply(5:36, function(i) Box.test(r1^2, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
+  )
+  
+
+# No se rechaza la hipótesis nula de autocorrelación
+p_valores_mlli1 %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw() +
+  geom_hline(yintercept = 0.05, color="red") +
+  xlab("Rezago") +
+  ylab("p-valor")
+
+
 
 # Test de normalidad de Shapiro-Wilks y Jarque-Bera
 shapiro.test(r1)
@@ -242,56 +281,73 @@ JarqueBera.test(r1_int)
 
 # Sigue habiendo un atipico fuerte!
 
-# Relajamos el criterio de outliers, porque sino no lo capta
-outliers1_int <- r1_int[r1_int < quantile(r1_int, 0.25) - 2.5*IQR(r1_int) | r1_int > quantile(r1_int, 0.75) + 2.5*IQR(r1_int)]
-    
-outliers1_int_index <- which(r1_int == outliers1_int)
+# Tests de autocorrelación conjunta
 
-# Incluimos un AO
-tipos_outliers_int <- outliers(c("AO", "AO", "AO"), c(outliers1_index, outliers1_int_index))
-
-outliers_effect_int <- outliers.effects(tipos_outliers_int, n = length(manzana_train))
-
-
-modelo1_int2 <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA, NA, NA, NA), xreg = outliers_effect_int)
-
-r1_int2 <- residuals(modelo1_int2)
-
-autoplot(r1_int2)
-
-
-# Tests de normalidad
-shapiro.test(r1_int2)
-JarqueBera.test(r1_int2)
-
-# No se rechaza la normalidad!
-
-## Prueba de Ljung-Box (por las dudas)
-p_valores_box1_int2 <- tibble(
-  lag = 4:36, 
-  p_valores = sapply(4:36, function(i) Box.test(r1_int2, lag = i, fitdf = 3 ,type = "Ljung-Box")$p.value)
+# Prueba de Ljung-Box
+p_valores_box1_int <- tibble(
+  lag = 5:36, 
+  p_valores = sapply(5:36, function(i) Box.test(r1_int, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
   )
 
-# No se rechaza la hipótesis nula de autocorrelación al 5%
-p_valores_box1_int2 %>% 
-  ggplot(aes(lag, p_valores)) +
-  geom_hline(yintercept = 0.05, color = "red") +
-  geom_point()+
+p_valores_box1_int %>%
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
   theme_bw() +
+  geom_hline(yintercept = 0.05, color="red") +
   xlab("Rezago") +
   ylab("p-valor")
 
-#choripan ayuda
 
-# Predicción 
+# Se rechaza la hipótesis nula de autocorrelación
+
+# VER DE BORRAR LO DE ABAJO, YA DESDE ACÁ N OSE CUMPLE NO AUTOCORRELACIÓN!!!!!!!!!!!!!!!!
+
+# # Relajamos el criterio de outliers, porque sino no lo capta
+# outliers1_int <- r1_int[r1_int < quantile(r1_int, 0.25) - 2.5*IQR(r1_int) | r1_int > quantile(r1_int, 0.75) + 2.5*IQR(r1_int)]
+#     
+# outliers1_int_index <- which(r1_int == outliers1_int)
+# 
+# # Incluimos un AO
+# tipos_outliers_int <- outliers(c("AO", "AO", "AO"), c(outliers1_index, outliers1_int_index))
+# 
+# outliers_effect_int <- outliers.effects(tipos_outliers_int, n = length(manzana_train))
+# 
+# 
+# modelo1_int2 <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA, NA, NA, NA), xreg = outliers_effect_int)
+# 
+# r1_int2 <- residuals(modelo1_int2)
+# 
+# autoplot(r1_int2)
+# 
+# 
+# # Tests de normalidad
+# shapiro.test(r1_int2)
+# JarqueBera.test(r1_int2)
+# 
+# # No se rechaza la normalidad!
+# 
+# ## Prueba de Ljung-Box 
+# p_valores_box1_int2 <- tibble(
+#   lag = 4:36, 
+#   p_valores = sapply(4:36, function(i) Box.test(r1_int2, lag = i, fitdf = 3 ,type = "Ljung-Box")$p.value)
+#   )
+# 
+# # Se rechaza la hipótesis nula de autocorrelación al 5%, intervenimos demasiado.
+# p_valores_box1_int2 %>% 
+#   ggplot(aes(lag, p_valores)) +
+#   geom_hline(yintercept = 0.05, color = "red") +
+#   geom_point()+
+#   theme_bw() +
+#   xlab("Rezago") +
+#   ylab("p-valor")
+
+# Predicción --------------------------------------------------------------------------------------------------
+
+# Nos quedamos con el modelo inicial, SIN INTERVENCIONES. Hay que hacer bootstrap para los intervalos 
 
 npred <- length(manzana_test)
-newxreg1 <- outliers.effects(tipos_outliers_int, n=length(manzana_train) + npred) 
-  
 
-outliers_pred1 <- newxreg1[(length(manzana)-npred+1):length(manzana),]
-
-prediccion1 <- forecast(modelo1_int2, h = 12, xreg = outliers_pred1, level = c(20, 40, 60, 80, 95))
+prediccion1 <- forecast(modelo1, h = 12, level = c(20, 40, 60, 80, 95), bootstrap = TRUE)
 
 (plot_prediccion1 <- autoplot(prediccion1) + 
     autolayer(manzana_test) +
@@ -304,7 +360,6 @@ prediccion1 <- forecast(modelo1_int2, h = 12, xreg = outliers_pred1, level = c(2
     scale_color_manual(labels = c("Precios reales"), values = c("red")) +
     theme_bw())
 
-# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
 
 medidas_error1 <- accuracy(prediccion1, manzana_test)
 ```
@@ -313,15 +368,23 @@ medidas_error1 <- accuracy(prediccion1, manzana_test)
 # MODELO ELEGIDO MEDIANTE CRITERIOS DE INFORMACIÓN
 
 # Identificación y estimación ------------------------------------------
+
+# ESTE ES EL PRIMERO QUE NOS QUEDAMOS MEDIANTE AICc
 modelo2 <- auto.arima(manzana_train)
 
+
 # Diagnóstico ------------------------------------------------------------
+
+# Significación de los parámetros, el primero de la parte sma no es significativo
+coeftest(modelo2)
+
+
+# Gráfico de los residuos: los outliers causarán problemas con la normalidad
 r2 <- residuals(modelo2)
 
-## Gráfico de los residuos: los outliers causarán problemas con la normalidad
 autoplot(r2)
 
-## Prueba de Ljung-Box
+# Prueba de Ljung-Box
 p_valores_box <- tibble(
   lag = 5:36, 
   p_valores = sapply(5:36, function(i) Box.test(r2, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
@@ -336,24 +399,29 @@ p_valores_box %>%
   xlab("Rezago") +
   ylab("p-valor")
 
+
+# Test de heteroscedasticidad
+test_mcleodli2 <- McLeod.Li.test(modelo2)
+
+
 ## Test de normalidad de Shapiro-Wilks
 shapiro.test(r2)
 JarqueBera.test(r2)
 
-# Vemos cuales son los atípicos
+# Se rechaza la normalidad
 
-outliers2 <- r2[r2 < quantile(r2, 0.25) - 3*IQR(r2) | r2 > quantile(r2, 0.75) + 3*IQR(r2)]
+# Vemos cuales son los atípicos
+# Criterio de outliers de Hyndman
+outliers2 <- r2[r2 < quantile(r2, 0.25) - 2.5*IQR(r2) | r2 > quantile(r2, 0.75) + 2.5*IQR(r2)]
 outliers2_index <- which(r2 == outliers2[1] | r2 == outliers2[2])
 
-tipos_outliers2 <- list(
-  tc_tc = outliers(c("TC", "TC"), outliers2_index),
-  tc_ao = outliers(c("TC", "AO"), outliers2_index),
-  ao_ao = outliers(c("AO", "AO"), outliers2_index),
-  ao_tc = outliers(c("AO", "TC"), outliers2_index)
-  )
+tipos_outliers2_TC <- outliers(c("TC", "TC"), outliers2_index)
+tipos_outliers2_AO <- outliers(c("AO", "AO"), outliers2_index)
+tipos_outliers2_TC_AO <- outliers(c("TC", "AO"), outliers2_index)
+
 
 # Se aumenta el delta porque el outlier de 2017 tiene un efecto fuerte
-outliers_effect2 <- outliers.effects(tipos_outliers[[1]], n = length(manzana_train), delta = 0.9)
+outliers_effect2 <- outliers.effects(tipos_outliers2_TC_AO, n = length(manzana_train), delta = 0.8)
 
 modelo2_int <- Arima(manzana_train, order = c(0, 1, 2), seasonal = c(0, 0, 2), xreg = outliers_effect2)
 
@@ -366,47 +434,36 @@ shapiro.test(r2_int)
 JarqueBera.test(r2_int)
 
 # Se rechaza la normalidad todavía, volvemos a intervenir
-
-# Criterio de outliers de Hyndman
-outliers2_int <- r2_int[r2_int < quantile(r2_int, 0.25) - 3*IQR(r2_int) | r2_int > quantile(r2_int, 0.75) + 3*IQR(r2_int)]
+outliers2_int <- r2_int[r2_int < quantile(r2_int, 0.25) - 2.5*IQR(r2_int) | r2_int > quantile(r2_int, 0.75) + 2.5*IQR(r2_int)]
     
-outliers2_int_index <- which(r2_int == outliers2_int[1] | r2_int == outliers2_int[2])
+outliers2_int_index <- which(r2_int %in% outliers2_int)
 
 # Incluimos un AO
-tipos_outliers2_int <- outliers(c("TC", "AO", "TC"), c(49,50,99))
+tipos_outliers2_int <- outliers(c("TC", "TC", "AO"), outliers2_int_index)
 
-outliers_effect2_int <- outliers.effects(tipos_outliers2_int, n = length(manzana_train))
+outliers_effect2_int <- outliers.effects(tipos_outliers2_int, n = length(manzana_train), delta  = 0.9)
 
 
 modelo2_int2 <- Arima(manzana_train, order = c(0, 1, 2), seasonal = c(0, 0, 2), xreg = outliers_effect2_int)
 
+coeftest(modelo2_int2)
+
 r2_int2 <- residuals(modelo2_int2)
 
-autoplot(r1_int2)
+autoplot(r2_int2)
 
-# Graficamos el efecto
-outliers_effect_int_tbbl <- outliers_effect_int %>% 
-  as_tibble() %>% 
-  mutate(fecha = seq(as.Date("2013-01-01"), as.Date("2021-05-01"), by = "month"))
-
-(plot_outliers_effects1 <- outliers_effect_int_tbbl %>% 
-  ggplot() +
-  geom_line(aes(x = fecha, y = TC49, color = "TC49")) +
-  geom_line(aes(x = fecha, y = AO50, color = "AO50")) +
-  geom_line(aes(x = fecha, y = TC99, color = "AO99")) +
-  labs(color = "Outlier", y = "Efecto", x = "Tiempo (Año)") +
-  theme_bw()) 
 
 # Tests de normalidad
 shapiro.test(r2_int2)
 JarqueBera.test(r2_int2)
 
-# No se rechaza la normalidad!
+# Se rechaza la normalidad (se puede aplicar bootstrap)
+
 
 ## Prueba de Ljung-Box (por las dudas)
 p_valores_box2_int2 <- tibble(
-  lag = 1:36, 
-  p_valores = sapply(1:36, function(i) Box.test(r2_int2, lag = i, fitdf = 4 , type = "Ljung-Box")$p.value)
+  lag = 5:36, 
+  p_valores = sapply(5:36, function(i) Box.test(r2_int2, lag = i, fitdf = 4 , type = "Ljung-Box")$p.value)
   )
 
 # No se rechaza la hipótesis nula de autocorrelación al 5%
@@ -416,16 +473,86 @@ p_valores_box2_int2 %>%
   geom_point()+
   theme_bw()
 
-# Predicción 
 
-newxreg2 <- outliers.effects(tipos_outliers2_int, n=length(manzana_train) + npred) 
+
+# De nuevo, ver outliers
+
+outliers2_int3 <- r2_int2[r2_int < quantile(r2_int2, 0.25) - 2.5*IQR(r2_int2) | r2_int2 > quantile(r2_int2, 0.75) + 2.5*IQR(r2_int2)]
+
+outliers2_int3_index <- which(r2_int2 %in% outliers2_int3)
+
+
+# Incluimos un AO
+tipos_outliers2_int3 <- outliers(c("TC", "TC", "AO", "TC"), outliers2_int3_index)
+
+outliers_effect2_int3 <- outliers.effects(tipos_outliers2_int3, n = length(manzana_train), delta  = 0.85)
+
+# ESTE ES EL OTRO MODELO QUE NOS QUEDAMOS DE LOS AICc
+modelo2_int3 <- Arima(manzana_train, order = c(0, 1, 2), seasonal = c(0, 0, 2), xreg = outliers_effect2_int3)
+
+coeftest(modelo2_int3)
+
+r2_int3 <- residuals(modelo2_int3)
+
+autoplot(r2_int3)
+
+
+# Tests de normalidad
+shapiro.test(r2_int3)
+JarqueBera.test(r2_int3)
+
+# No se rechaza la normalidad
+
+## Prueba de Ljung-Box (por las dudas)
+p_valores_box2_int3 <- tibble(
+  lag = 5:36, 
+  p_valores = sapply(5:36, function(i) Box.test(r2_int3, lag = i, fitdf = 4 , type = "Ljung-Box")$p.value)
+  )
+
+# No se rechaza la hipótesis nula de autocorrelación al 5%
+p_valores_box2_int3 %>% 
+  ggplot(aes(lag, p_valores)) +
+  geom_hline(yintercept = 0.05, color = "red") +
+  geom_point()+
+  theme_bw()
+
+# Test de heteroscedasticidad
+test_mcleodli2_3 <- McLeod.Li.test(modelo2_int3)
+
+
+# Predicción --------------------------------------------------------------------
+
+# Modelo con 4 intervenciones
+
+newxreg2 <- outliers.effects(tipos_outliers2_int3, n=length(manzana_train) + npred) 
   
 
 outliers_pred2 <- newxreg2[(length(manzana)-npred+1):length(manzana),]
 
-prediccion2 <- forecast(modelo2_int2, h = 12, xreg = outliers_pred2, level = c(20, 40, 60, 80, 95))
+prediccion2 <- forecast(modelo2_int3, h = 12, xreg = outliers_pred2, level = c(20, 40, 60, 80, 95))
 
 (plot_prediccion2 <- autoplot(prediccion2) + 
+    autolayer(manzana_test) +
+    labs(
+      x = "Tiempo (Año)", 
+      y = "Precio promedio ($UY X Kg)",
+      title = "Predicción a 12 pasos de precios de manzana. ARIMA(0,1,2)(0,0,2)[12]. 4 intervenciones de outliers.",
+      color = ""
+      ) +
+    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+    theme_bw())
+
+# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
+medidas_error2 <- accuracy(prediccion2, manzana_test)
+
+
+
+# Predicción, sin intervenciones, CIs aplicando bootstrap.
+
+
+prediccion2_boot <- forecast(modelo2, h = 12, level = c(20, 40, 60, 80, 95), bootstrap = TRUE)
+
+(plot_prediccion2 <- autoplot(prediccion2_boot) + 
     autolayer(manzana_test) +
     labs(
       x = "Tiempo (Año)", 
@@ -436,48 +563,56 @@ prediccion2 <- forecast(modelo2_int2, h = 12, xreg = outliers_pred2, level = c(2
     scale_color_manual(labels = c("Precios reales"), values = c("red")) +
     theme_bw())
 
-# Acá tener en cuenta la problemática de incluir un outlier hacia el final del periodo de predicción
-medidas_error2 <- accuracy(prediccion2, manzana_test)
+medidas_error2_boot <- accuracy(prediccion2_boot, manzana_test)
 
+# Mucho menos error que en el modelo intervenido
 ```
+
 
 ```{r modelo3}
 # MODELO CON INTERVENCIONES SELECCIONADAS POR TSO
 
 # Identificación y estimación -----------------------------------------------------------
-modelo_tso <- tso(manzana_train, types = c("TC", "AO"))
+# Un ls no tiene sentido en este caso, por eso no se incluyen en la seleccion
 
+# ESTE ES EL MODELO QUE NOS QUEDAMOS CON SELECCION AUTOMATICA
+modelo_tso <- tso(manzana_train, types = c("TC", "AO"))
 
 plot(modelo_tso)
 
 # Diagnóstico ---------------------------------------------------------------------------
 
+coeftest(modelo_tso$fit)
+
+# Gráfico de los residuos: los outliers siguen causando problemas con la normalidad
+
 r_tso <- residuals(modelo_tso$fit)
 
-## Gráfico de los residuos: los outliers siguen causando problemas con la normalidad
 autoplot(r_tso)
-
 
 ggAcf(r_tso)
 ggAcf(r_tso, type = "partial")
 
 
-
-## Prueba de Ljung-Box
+# Prueba de Ljung-Box
 p_valores_box_tso <- tibble(
   lag = 4:36, 
   p_valores = sapply(4:36, function(i) Box.test(r_tso, lag = i, type = "Ljung-Box", fitdf=3)$p.value)
   )
 
-
-## No se rechaza la hipótesis nula de no autocorrelación
-p_valores_box_tso[] %>% 
+# No se rechaza la hipótesis nula de no autocorrelación
+p_valores_box_tso %>% 
   ggplot() +
   geom_point(aes(lag, p_valores))+
   theme_bw() +
   geom_hline(yintercept = 0.05, color="red") +
   xlab("Rezago") +
   ylab("p-valor")
+
+# Test heteroscedasticidad
+test_mcleodli_tso <- McLeod.Li.test(modelo_tso$fit)
+
+# No se rechaza la heteroscedasticidad
 
 # Test de normalidad de Shapiro-Wilks
 shapiro.test(r_tso)
@@ -511,6 +646,7 @@ prediccion_tso <- forecast(modelo_tso$fit, h = npred, xreg = outliers_pred3, lev
 medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 ```
 
+
 ```{r modelo4}
 # MODELO CON INTERVENCIONES OBTENIDAS POR METODOS DEL PAQUETE TSOUTLIERS
 
@@ -523,9 +659,11 @@ autoplot(manzana_train_clean)
 modelo_clean <- auto.arima(manzana_train_clean)
 
 # Diagnóstico ---------------------------------------------------------------------------
-r_clean <- residuals(modelo_clean)
+coeftest(modelo_clean)
 
 ## Gráfico de los residuos: los outliers todavía presentes
+r_clean <- residuals(modelo_clean)
+
 autoplot(r_clean)
 
 ## Prueba de Ljung-Box
@@ -534,7 +672,7 @@ p_valores_box_clean <- tibble(
   p_valores = sapply(4:36, function(i) Box.test(r_clean, lag = i, type = "Ljung-Box", fitdf=3)$p.value)
   )
 
-## No se rechaza la hipótesis nula de no autocorrelación
+## Se rechaza la hipótesis nula de no autocorrelación, se descarta este modelo
 p_valores_box_clean %>% 
   ggplot() +
   geom_point(aes(lag, p_valores))+
@@ -544,37 +682,62 @@ p_valores_box_clean %>%
   ylab("p-valor")
 
 ## Test de normalidad de Shapiro-Wilks
-shapiro.test(r_clean)
-JarqueBera.test(r_clean)
+# shapiro.test(r_clean)
+# JarqueBera.test(r_clean)
 
 
 ## Se rechaza la hipótesis nula de normalidad, usamos bootstrap para los intervalos.
 
-
-prediccion_clean <- forecast(modelo_clean, bootstrap=TRUE, h=length(manzana_test), level = c(20, 40, 60, 80, 95))
-
-
-(plot_prediccion_clean <- autoplot(prediccion_clean) +
-    autolayer(manzana_test) +
-    labs(
-      x = "Tiempo (Año)", 
-      y = "Precio promedio ($UY X Kg)",
-      title = "Predicción a 12 pasos de precios de manzana. ARIMA(0,0,1)(2,0,0)[12]. Intervenido.",
-      color = ""
-      ) +
-    scale_color_manual(labels = c("Precios reales"), values = c("red")) +
-    theme_bw())
-
-
-medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
+# prediccion_clean <- forecast(modelo_clean, bootstrap=TRUE, h=length(manzana_test), level = c(20, 40, 60, 80, 95))
+# 
+# 
+# (plot_prediccion_clean <- autoplot(prediccion_clean) +
+#     autolayer(manzana_test) +
+#     labs(
+#       x = "Tiempo (Año)", 
+#       y = "Precio promedio ($UY X Kg)",
+#       title = "Predicción a 12 pasos de precios de manzana. ARIMA(0,0,1)(2,0,0)[12]. Intervenido.",
+#       color = ""
+#       ) +
+#     scale_color_manual(labels = c("Precios reales"), values = c("red")) +
+#     theme_bw())
+# 
+# 
+# medidas_error_tso <- accuracy(prediccion_tso, manzana_test)
 
 ```
 
 ```{r modelo5}
 # ETS
+
+# ESTE QUEDA PARA COMPARAR TAMBIÉN Y PORQUE TIENE UN MODELO ESTRUCTURAL POR DEBAJO
 modelo_ets <- ets(manzana_train)
 
-prediccion_ets <- forecast(modelo_ets, h = 12, level = c(20, 40, 60, 80, 95))
+prediccion_ets <- forecast(modelo_ets, h = 12, level = c(20, 40, 60, 80, 95), bootstrap = TRUE)
+
+
+r_ets <- residuals(modelo_ets)
+
+## Prueba de Ljung-Box
+p_valores_box_ets <- tibble(
+  lag = 16:36, 
+  p_valores = sapply(16:36, function(i) Box.test(r_ets, lag = i, type = "Ljung-Box", fitdf=15)$p.value)
+  )
+
+
+
+
+## Se rechaza la hipótesis nula de no autocorrelación, descartar? Es el que predice mejor
+p_valores_box_clean %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw() +
+  geom_hline(yintercept = 0.05, color="red") +
+  xlab("Rezago") +
+  ylab("p-valor")
+
+
+
 
 (plot_prediccion_ets <- prediccion_ets %>% 
   autoplot() +
@@ -592,9 +755,6 @@ medidas_error_ets <- accuracy(prediccion_ets, manzana_test)
 
 ```
 
-```{r modelo6}
-# Modelo de espacio estado (estructural) - EXTRA SI DA EL TIEMPO
-```
 
 
 <!-- Desarrollo del informe de acá en adelante -->
@@ -625,15 +785,12 @@ $$\rho(t, t+j) = \frac{Cov(Y_t, Y_{t+j})}{\sigma_t\sigma_{t+j}}  $$
 
 Mientras que la función de autocorrelación parcial (PACF) es la autocorrelación entre  $Y_t$ y $Y_{t+j}$ una vez se quita el efecto de las correlaciones intermedias que hay entre ambas variables [@notas_series].
 
-Estas funciones se deben estimar a partir de los datos, obteniéndose la autocorrelación muestral. En la figura \@ref(fig:acf1) se presentan los primeros 72 valores de ambas funciones para la serie original de precios de manzana, junto con el intervalo de confianza de la prueba de hipótesis $H_0) \rho_j = 0$ vs $H_0) \rho_j \ne 0$. En la ACF se puede distinguir que las primeras 5 autocorrelaciones resultan significativas y también las que están en torno al lag 24 y entre los lags 36 y 48. Esto puede ser un indicio de estacionalidad anual o bianual.
+Estas funciones se deben estimar a partir de los datos, obteniéndose la autocorrelación muestral. En la figura \@ref(fig:acf1) del Anexo se presentan los primeros 72 valores de ambas funciones para la serie original de precios de manzana, junto con el intervalo de confianza de la prueba de hipótesis $H_0) \rho_j = 0$ vs $H_0) \rho_j \ne 0$. En la ACF se puede distinguir que las primeras 5 autocorrelaciones resultan significativas y presentan un decaimiento exponencial y que también son significativas las que están en torno al rezago 24 y entre los rezagos 36 y 48. Lo primero puede ser indicio de una estructura autorregresiva subyacente y lo segundo un indicio de estacionalidad anual o bianual.
 
-Por otro lado, en la PACF se aprecia que los valores para los primeros dos lags son significativamente distintos a 0. Esto puede ser un indicio de que hay una estructura autorregresiva en los datos.
+Por otro lado, en la PACF se aprecia que los valores para los primeros dos lags son significativamente distintos a 0. Esto puede ser un indicio de que hay una estructura autorregresiva, posiblemente de segundo orden, en los datos.
 
 ### Dominio de las frecuencias
 
-```{r acf1, fig.cap="Funciones de autocorrelación y autocorrelación parcial muestrales de la serie de precios de manzana.", include = TRUE}
-grid.arrange(plot_acf1, plot_pacf1)
-```
 
 Desde la perspectiva del dominio de las frecuencias de la serie se considera esta última en su expresión trigonométrica, mediante una suma ponderada de funciones periódicas coseno y seno. El espectro poblacional puede resultar de utilizad para observar la estructura de variabilidad de la serie, dado que el área por debajo del mismo es la variabilidad asociada a las frecuencias consideradas.
 
@@ -663,9 +820,7 @@ H_0) \rho = 1 \\
 H_1) \rho < 1 \\
 $$
 
-Empleando el estadístico $(\hat{\rho} - 1) / \sigma_{\hat{\rho}}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller.
-
-El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
+Empleando el estadístico $ (\hat{\rho} - 1) / \sigma_{\hat{\rho}} $, que si $ \rho $ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller. El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
 
 Por otro lado la propuesta de prueba de raíz unitaria de Phillip-Perron se basa en la de Dickey y Fuller, pero además los compatibilizan con la presencia de heteroscedasticidad y/o autocorrelación de los errores.
 
@@ -675,22 +830,9 @@ Para la serie planteada, al observar los p-valores, ambos tests llevan a no rech
 grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 ```
 
-Observando los nuevos autocorrelogramas (\@ref(fig:acf2) se puede notar como el primer valor del ACF resulta significativamente distinto a 0 (lo cual puede ser indicio de un componente de medias móviles de orden 1) y lo mismo se da para los valores en torno al lag 24 y 48 (indicio de un componente estacional autorregresivo de orden 2). Esto último vuelve a indicar la presencia de una estructura de dependencia estacional. Por otro lado, en la PACF, se aprecia que solo los dos primeros valores son significativos, lo cual puede indicar cierta estructura autorregresiva, posiblemente de orden 2. A pesar de esto, hay que tener en cuenta que al tratar de identificar el orden de un proceso ARIMA mediante la FAC y PACF los elementos del procesos comienzan a mezclarse y no resulta tan claro la cantidad de parámetros a elegir. 
+Observando los nuevos autocorrelogramas (\@ref(fig:acf2) se puede notar como de entre los primeros valores de la ACF solo el primero resulta significativamente distinto a 0 (lo que puede indicar un componente de medias móviles de primer orden) y lo mismo se da para los valores en torno al lag 24 y 48. Esto último vuelve a indicar la presencia de una estructura de dependencia estacional (indicio de un componente estacional autorregresivo de orden 2). Por otro lado, en la PACF, se aprecia que solo los dos primeros valores son significativos, lo cual puede indicar cierta estructura autorregresiva, posiblemente de orden 2. A pesar de esto, hay que tener en cuenta que en las aplicaciones prácticas al tratar de identificar el orden de un proceso ARIMA mediante la FAC y PACF la distinción entre especificaciones puede volverse difusa y no resulta tan claro la cantidad de parámetros a elegir. 
 
-Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$ (en adelante "Modelo manual"), de la forma:
-
-$$\Phi_2(L^{12})\phi_2(L)\Delta^1 Y_t = \theta_1(L)\varepsilon_t$$
-Donde:
-
-$$\Phi_2(L^{12}) = 1-\Phi_1L^{12}-\Phi_2 L^{24}$$
-
-$$\phi_2(L) = 1-\phi_1 L-\phi_2 L^{2}$$
-
-$$\Delta^1 = 1-L$$
-
-$$\theta_1(L) = 1-\theta_1L$$
-
-$$\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2) $$
+Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$ (en adelante " _modelo manual_").
 
 ### Selección mediante criterios de información
 
@@ -698,8 +840,8 @@ Una forma alternativa de elegir la especificación del modelo, esto es, la canti
 
 Uno de los más empleados y en particular el que se considera en la función _auto.arima()_ empleada para la estimación es el criterio de información de Akaike corregido (AICc). Su fórmula para un modelo es:
 
-$$AICc = T\log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
-Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_{MV}$ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
+$$ AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T} $$
+Siendo $T$ el número de observaciones, $k$ el de parámetros y $ \hat{\sigma}^2_{MV} $ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
 
 El modelo seleccionado mediante esta metodología (de ahora en adelante "Modelo AICc") resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera un componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza múltiples tests de raíz unitaria). Además, se considera un componente estacional de medias móviles de orden 2, en lugar de autorregresivo como era en el caso del modelo anterior.
 
@@ -709,35 +851,129 @@ Luego de haber identificado la especificación del modelo, el paso que sigue es 
 
 En particular, el método empleado es la estimación máximo verosímil condicional, donde se supone que la primera observación de la serie es determinística y se maximiza la verosimilitud condicionada a dicha observación. Esto simplifica las expresiones de las funciones, y si el tamaño de muestra es razonablemente grande, la primera observación no tendrá gran efecto sobre la verosimilitud estimada. 
 
-Los parámetros resultantes de la estimación para el modelo manual, una vez intervenido, son:
 
-* Parte autorregresiva: $\hat \phi_1 = 0.951$ y $\hat \phi_2 = -0.4463$.
+### Pruebas de significación de los parámetros
 
-* Parte medias móviles: $\hat \theta_1 = -0.4157$.
+Para completar la especificación se realizan pruebas de hipótesis sobre la significación de los parámetros estimados. La hipótesis para cada uno de ellos, siendo $\lambda$ un parámetro cualquiera del modelo:
 
-* Parte autorregresiva estacional: $\hat \Phi_1 = 0.102 $ y $\hat \Phi_2 = 0.397$.
+$$H_0) \lambda = 0$$
+$$H_1)\lambda \ne 0$$
+Donde el estadístico empleado es:
 
-* Varianza de las estimaciones: $\hat \sigma^2=15.82$
+$$z = \hat{\lambda} / \hat{\sigma}_{\lambda}$$
+Para el que se cumplirá la Normalidad asintótica debido a que la estimación se realizó por máxima verosimilitud [@hamilton_1994, p. 143].
+
+Realizando esta prueba para los coeficientes del _modelo manual_ todos resultan significativos al 5% de confianza con la excepción del parámetro de medias móviles (MA) y el primer parámetro autorregresivo estacional (sAR). Se opta entonces por eliminar el componente MA de la especificación y restringir el primer parámetro sAR a 0.
+
+### La especificación del _modelo manual_ final
+
+La forma del modelo identificado de manera manual es:
+
+$$\Phi_2(L^{12})\phi_2(L)\Delta^1 Y_t =  \varepsilon_t$$
+Donde:
+
+$$\Phi_2(L^{12}) = 1-\Phi_2 L^{24}$$
+
+$$\phi_2(L) = 1-\phi_1 L-\phi_2 L^{2}$$
+
+$$\Delta^1 = 1-L$$
+Y se supone en un principio que los residuos son de media 0, homoscedásticos, incorrelacionados y:
+
+$$\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2) $$
+
+Los parámetros resultantes de la estimación para el _modelo manual_, son:
+
+* Parte autorregresiva: $ \hat{\phi}_1 = 0.557 $ y $ \hat{\phi}_1 = -0.277 $
+
+* Parte medias móviles: $ \hat{\theta}_1 = -0.4157 $
+
+* Parte autorregresiva estacional:  $ \hat{\Phi}_2 = 0.415 $
+
+* Varianza de las estimaciones: $ \hat{\sigma}^2 = 15.82 $
 
 ## Diagnóstico
 
-### Atípicos: La pandemia
+Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados sobre los residuos, sobre los cuales se sostienen los modelos. 
 
-Como se mencionó anteriormente, a simple vista es posible identificar que la pandemia de Coronavirus tuvo un impacto sobre los precios, así que esto deberá ser incluido en la modelización cuanto antes. Una manera de tener en cuenta este efecto atípico es considerar que hay un cambio transitorio (TC por sus siglas en inglés), un suceso que tiene un efecto que perdura en la serie pero no es permanente.
+### Media 0 de los residuos
 
-Posteriormente se deberá poner a prueba la presencia de otros atípicos.
+Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza.
+
+```{r}
+t.test(r1, mu = 0)
+
+# Alternativa para no tener que suponer normalidad?
+# wilcox.test(r1, mu = 0)
+
+```
 
 
-## Predicción
+### Incorrelación de los erores
 
-Realizaremos predicción para los siguientes modelos, que son los que mejor cumplen los supuestos:
+Un supuesto cuyo cumplimiento es clave es la incorrelación de los errores, debido a que toda estructura de dependencia que no se esté captando en el modelo irá a parar a los residuos, el proxy con el que contamos para conocer el comportamiento de los errores. Si hay correlaciones entre los errores, la especificación del modelo todavía no capta el comportamiento de los datos.
 
-* **modelo_tso:** Modelo intervenido con el procedimiento automático de detección de outliers del paquete _tso_. Cumple tanto el supuesto de no autocorrelación de los residuos como el supuesto de normalidad.
+Para evaluar el cumplimiento de este supuesto un contraste usual es el de autocorrelación conjunta de Ljung-Box, donde la hipótesis nula es que los residuos son incorrelacionados contra la alternativa de que no lo son. El estadístico para realizar el contraste con los primeros $h$ rezagos es:
 
-* **modelo_clean:** Modelo intervenido con por métodos del paquete _tsoutliers_, que reemplaza los mismos a través de interpolación lineal. Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad.
+$$Q_{L-B}(h) = (T(T+2)) \frac{\sum^h_1 (\hat{\rho}_j)^2}{T-j}$$
 
-* **modelo_tbats:** Modelo TBATS (explicar más). Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad (la única hipótesis nula que no se rechaza en este sentido es la de asimetría).
+El cual se distribuye asintóticamente $\chi^2_{h-m}$ bajo la hipótesis nula, donde $m$ es el número de parámetros del modelo.
+
+Para el __modelo manual__, $m = 3$. En la figura \@ref(fig:ljungbox) se presentan los p-valores de la prueba conjunta, aumentando sucesivamente el número de rezagos considerados. Se puede observar que considerando hasta los primeros 36 rezagos, no se rechaza la hipótesis nula de incorrelación de los residuos, por lo que el modelo resulta apropiado en este aspecto.  
+
+```{r ljungbox}
+p_valores_box1 %>% 
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw() +
+  geom_hline(yintercept = 0.05, color="red") +
+  xlab("Rezago") +
+  ylab("p-valor")
+```
+
+
+
+
+### Homoscedasticidad
+
+Otro supuesto que se realizó fue sobre la varianza de los errores, la cual se desea constante. Para ponerlo a prueba se realiza el test desarrollado en @mcleod_li_1983. Es básicamente una prueba de Box-Ljung sobre los residuos al cuadrado del modelo. La hipótesis nula de esta prueba es la homoscedasticidad entre los k rezagos considerados.
+
+```{r mcleodli, fig.cap = "P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE}
+McLeod.Li.test(modelo1, omit.initial = TRUE)
+```
+
+En la figura \@ref(fig:mcleodli) se presentan los valores de los p-valores de la prueba para los primeros 19 rezagos. Se puede apreciar que considerando en conjunto hasta el décimo rezago hay presencia de heteroscedasticidad. Esto es una indicación que los modelos del tipo SARIMA puede no ser los más adecuados y se tendría que recurrir a los del tipo ARCH/GARCH donde se busca modelizar la varianza de los errores.
+
+
+### Normalidad
+
+
+
+
+
+
+
+
+<!-- Como se mencionó anteriormente, a simple vista es posible identificar que la pandemia de Coronavirus tuvo un impacto sobre los precios, así que esto deberá ser incluido en la modelización cuanto antes. Una manera de tener en cuenta este efecto atípico es considerar que hay un cambio transitorio (TC por sus siglas en inglés), un suceso que tiene un efecto que perdura en la serie pero no es permanente. -->
+
+<!-- Posteriormente se deberá poner a prueba la presencia de otros atípicos. -->
+
+
+# Predicción
+
+<!-- Realizaremos predicción para los siguientes modelos, que son los que mejor cumplen los supuestos: -->
+
+<!-- * **modelo_tso:** Modelo intervenido con el procedimiento automático de detección de outliers del paquete _tso_. Cumple tanto el supuesto de no autocorrelación de los residuos como el supuesto de normalidad. -->
+
+<!-- * **modelo_clean:** Modelo intervenido con por métodos del paquete _tsoutliers_, que reemplaza los mismos a través de interpolación lineal. Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad. -->
+
+<!-- * **modelo_tbats:** Modelo TBATS (explicar más). Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad (la única hipótesis nula que no se rechaza en este sentido es la de asimetría). -->
 
 
 
 # Conclusiones
+
+# Anexo
+
+```{r acf1, fig.cap="Funciones de autocorrelación y autocorrelación parcial muestrales de la serie de precios de manzana.", include = TRUE}
+grid.arrange(plot_acf1, plot_pacf1)
+```
