@@ -56,7 +56,7 @@ La serie a ser estudiada es la de precios promedio mensuales del kilo de manzana
 Se cuentan con los datos desde enero de 2013 a mayo de 2022  y se considerará el promedio mensual de los precios, por lo que se cuentan con 113 observaciones. En lugar de emplear los datos bisemanales o el promedio semanal se opta por la frecuencia mensual debido a la dificultad de emplear el herramental de los modelos SARIMA para tales tipos de series, en particular para el tratamiento de la estacionalidad.
 
 
-```{r plot_precios, fig.cap="Serie de precios mensuales del Kg de manzana en pesos Uruguayos.", include = TRUE}
+```{r plot_precios, fig.cap="Serie de precios mensuales del Kg de manzana en pesos uruguayos.", include = TRUE}
 autoplot(manzana) +
   theme_bw() +
   labs(x = "Tiempo (Años)",  y = "Precio promedio ($UY por Kg)" )
@@ -808,17 +808,12 @@ spectrum(manzana_train,  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab 
 
 ### Tests de raíces unitarias
 
-Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, cuenta con una raíz unitaria. En dicho caso el proceso es no estacionario la cual implica que no puede ser modelado en el marco de los ARMA. 
+Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, si cuenta con una raíz unitaria. En dicho caso el proceso sería no estacionario la cual implicaría que no puede ser modelado en el marco de los ARMA. 
 
 Hay múltiples pruebas de hipótesis que han sido desarrolladas con el propósito de identificar raíces unitarias. Dos de ellos son el de Dickey-Fuller aumentado y el de Phillips-Perron. En el caso del primero se especifica el proceso proceso estocástico subyacente como:
 
 $$Y_t = \rho Y_{t-1} + \varepsilon_t, \,\,\,\, \varepsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)$$
-Y se contrasta:
-
-$$H_0) \rho = 1 \\
-H_1) \rho < 1 \\$$
-
-Empleando el estadístico $(\hat{\rho} - 1) / \sigma_{\hat{\rho}}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller. El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
+Y se contrasta $H_0) \rho = 1$ vs $H_1) \rho < 1 \\$. Empleamos el estadístico $(\hat{\rho} - 1) / \sigma_{\hat{\rho}}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller. El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
 
 Por otro lado la propuesta de prueba de raíz unitaria de Phillip-Perron se basa en la de Dickey y Fuller, pero además los compatibilizan con la presencia de heteroscedasticidad y/o autocorrelación de los errores.
 
@@ -836,12 +831,12 @@ Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un m
 
 Una forma alternativa de elegir la especificación del modelo, esto es, la cantidad de parámetros y de diferencias, es mediante los criterios de información. Con estos criterios se busca elegir entre una selección de modelos aquel con una mayor verosimilitud, penalizando por la cantidad de parámetros que tenga. 
 
-Uno de los más empleados y en particular el que se considera en la función _auto.arima()_ empleada para la estimación es el criterio de información de Akaike corregido (AICc). Su fórmula para un modelo es:
+Uno de los más empleados, y en particular el que se considera en la función _auto.arima()_ del software R empleada para la estimación, es el criterio de información de Akaike corregido (AICc). Su fórmula para un modelo es:
 
 $$AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
 Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_{MV}$ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
 
-El modelo seleccionado mediante esta metodología (de ahora en adelante "Modelo AICc") resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera un componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza múltiples tests de raíz unitaria). Además, se considera un componente estacional de medias móviles de orden 2, en lugar de autorregresivo como era en el caso del modelo anterior.
+El modelo seleccionado mediante esta metodología (de ahora en adelante "Modelo AICc") resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera un componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza múltiples tests de raíz unitaria). Además, se considera un componente estacional de medias móviles de orden 2, en lugar de autorregresivo como era en el caso del modelo manual.
 
 ## Estimación
 
