@@ -781,7 +781,7 @@ Donde el parámetro $\lambda$ se estima por máxima verosimilitud. En el caso de
 
 Como primer elemento a considerar en la identificación de un modelo ARIMA resultan útiles las funciones de autocorrelación y autocorrelación parcial. Al graficarlas en ellas se puede visualizar la estructura de dependencia temporal de la serie trabajada e indicios de la estacionariedad o ausencia de ella. La función de autocorrelación (ACF) se define como:
 
-$$\rho(t, t+j) = \frac{Cov(Y_t, Y_{t+j})}{\sigma_t\sigma_{t+j}}  $$
+$$\rho(t, t+j) = \frac{Cov(Y_t, Y_{t+j})}{\sigma_t\sigma_{t+j}}$$
 
 Mientras que la función de autocorrelación parcial (PACF) es la autocorrelación entre  $Y_t$ y $Y_{t+j}$ una vez se quita el efecto de las correlaciones intermedias que hay entre ambas variables [@notas_series].
 
@@ -815,12 +815,10 @@ Hay múltiples pruebas de hipótesis que han sido desarrolladas con el propósit
 $$Y_t = \rho Y_{t-1} + \varepsilon_t, \,\,\,\, \varepsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)$$
 Y se contrasta:
 
-$$
-H_0) \rho = 1 \\
-H_1) \rho < 1 \\
-$$
+$$H_0) \rho = 1 \\
+H_1) \rho < 1 \\$$
 
-Empleando el estadístico $ (\hat{\rho} - 1) / \sigma_{\hat{\rho}} $, que si $ \rho $ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller. El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
+Empleando el estadístico $(\hat{\rho} - 1) / \sigma_{\hat{\rho}}$, que si $\rho$ es menor a 1 en valor absoluto se distribuye normal asintóticamente y si es igual a 1 debe usarse una distribución empírica tabulada por Fuller. El test además toma en cuenta la posible autocorrelación de los errores incluyendo rezagos de la variable en la regresión auxiliar para mayor robustez.
 
 Por otro lado la propuesta de prueba de raíz unitaria de Phillip-Perron se basa en la de Dickey y Fuller, pero además los compatibilizan con la presencia de heteroscedasticidad y/o autocorrelación de los errores.
 
@@ -840,8 +838,8 @@ Una forma alternativa de elegir la especificación del modelo, esto es, la canti
 
 Uno de los más empleados y en particular el que se considera en la función _auto.arima()_ empleada para la estimación es el criterio de información de Akaike corregido (AICc). Su fórmula para un modelo es:
 
-$$ AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T} $$
-Siendo $T$ el número de observaciones, $k$ el de parámetros y $ \hat{\sigma}^2_{MV} $ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
+$$AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
+Siendo $T$ el número de observaciones, $k$ el de parámetros y $\hat{\sigma}^2_{MV}$ el estimador máximo verosímil de la varianza de los errores. El modelo seleccionado es aquel con el menor valor del AICc, lo cuál a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
 
 El modelo seleccionado mediante esta metodología (de ahora en adelante "Modelo AICc") resulta en un $ARIMA(0,1,2)(0,0,2)$. Se puede observar que no se considera un componente autorregresivo, pero si un componente estacional de medias móviles y al igual que el anterior modelo, una diferencia (el algoritmo de _auto.arima()_ realiza múltiples tests de raíz unitaria). Además, se considera un componente estacional de medias móviles de orden 2, en lugar de autorregresivo como era en el caso del modelo anterior.
 
@@ -879,17 +877,17 @@ $$\phi_2(L) = 1-\phi_1 L-\phi_2 L^{2}$$
 $$\Delta^1 = 1-L$$
 Y se supone en un principio que los residuos son de media 0, homoscedásticos, incorrelacionados y:
 
-$$\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2) $$
+$$\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)$$
 
 Los parámetros resultantes de la estimación para el _modelo manual_, son:
 
-* Parte autorregresiva: $ \hat{\phi}_1 = 0.557 $ y $ \hat{\phi}_1 = -0.277 $
+* Parte autorregresiva: $\hat{\phi}_1 = 0.557$ y $\hat{\phi}_1 = -0.277$
 
-* Parte medias móviles: $ \hat{\theta}_1 = -0.4157 $
+* Parte medias móviles: $\hat{\theta}_1 = -0.4157$
 
-* Parte autorregresiva estacional:  $ \hat{\Phi}_2 = 0.415 $
+* Parte autorregresiva estacional:  $\hat{\Phi}_2 = 0.415$
 
-* Varianza de las estimaciones: $ \hat{\sigma}^2 = 15.82 $
+* Varianza de las estimaciones: $\hat{\sigma}^2 = 15.82$
 
 ## Diagnóstico
 
