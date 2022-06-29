@@ -980,16 +980,30 @@ Adicionalmente resulta de importancia cuantificar la incertidumbre que tenemos s
 
 ## Medidas de error
 
-Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a distintas medidas de error, cada cual con sus particularidades. 
+Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a cuatro medidas de error, cada cual con sus particularidades que se desarrollan a continuación. 
 
-La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico (generalmente se minimiza el RMSE para obtener las predicciones). Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $e_s =  Y_{t+s} - Y^*_{t+s|t}$: 
+La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico [@hyndman_koehler_2006]. Por ejemplo, se minimiza el RMSE para obtener las predicciones como se desarrolló en la subsección anterior. Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $e_s =  Y_{t+s} - Y^*_{t+s|t}$: 
 
 * Raíz del error cuadrático medio (RMSE) = $\sum_{i=1}^s e_i^2$
 
 * Error absoluto medio (MAE) = $\sum_{i=1}^s |e_i|$
 
+Por otro lado, otro tipo de medidas son las basadas en errores porcentuales. Dichos errores están dados por: $p_s = 100e_t/Y_s$. Este tipo de medidas son independientes de la escala, lo que las hace idóneas para comparar el desempeño predictivo de modelos con distintas escalas (como es el caso de nuestra selección). Hay que tener en cuenta que si la serie presenta valores cero o infinitos esta medida no está definida, cuando tiene valores cercanos a cero presenta una distribución sesgada y en el caso de la media de los valores absolutos de los porcentajes de error (MAPE); penaliza más severamente los errores positivos que los negativos. Se emplea esta última medida ya que no se cuenta con valores negativos, cero o cercanos a cero en la muestra:
 
-```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
+media de los valores absolutos de los porcentajes de error (MAPE) = $\sum_{i=1}^s|p_i|$
+
+Para enfrentarse a las problemáticas de las medidas de error antes presentadas, en @hyndman_koehler_2006 se propone una medida donde se usan los errores escalados con el MAE dentro de la muestra: $q_s = e_t/(\frac{1}{n-1}\sum_{j=1}^n |Y_j-Y_{j-1}|)$ y la fórmula de la medida es:
+
+Error escalado absoluto medio (MASE) = $\sum_{i=1}^s|q_i|$
+
+### Predicción dentro de la muestra
+
+Como una forma de medir el ajuste del modelo a la serie trabajada en general se calculan las predicciones a un paso del modelo dentro de la muestra de entrenamiento, comparándose con el valor verdadero de la serie. Hay que tener en cuenta que el modelo con el que se hacen estas predicciones es ajustado con todos los datos y no con los que se tienen al momento de la predicción, por lo que no resulta una buena referencia para evaluar el modelo en cuanto a sus predicciones fuera de la muestra.
+
+En la figura \@ref(fig:errortrain) se presentan los valores de las medidas planteadas evaluadas dentro de la muestra para los cinco modelos seleccionados. Si bien las diferencias no son substanciales, se puede observar que el modelo con ajuste de outliers automático _modelo_tso_ presenta el mejor desempeño en todas las medidas (si bien su escala es distinta porque no toma en cuenta diferencias como los otros SARIMA, las predicciones son consideradas a niveles). El que le sigue es el _modelo_aicc_int_. Hay que tomar en cuenta que ambos modelos tienen múltiples intervenciones (el primero 7 y el segundo 4), algunas estando al final de la muestra, lo cual puede tener efectos negativos sobre la predicción. 
+
+
+```{r errortrain, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
 errores_train <- rbind(
   "modelo_manual"=medidas_error1[1,c(2,3,5,6)],
   "modelo_aicc"=medidas_error2_boot[1,c(2,3,5,6)],
