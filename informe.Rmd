@@ -210,7 +210,7 @@ autoplot(r1)
 # Prueba de Ljung-Box
 p_valores_box1 <- tibble(
   lag = 5:36, 
-  p_valores = sapply(5:36, function(i) Box.test(r1, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
+  p_valores = sapply(5:36, function(i) Box.test(r1, lag = i, fitdf = 3, type = "Ljung-Box")$p.value)
   )
 
 # No se rechaza la hipótesis nula de autocorrelación
@@ -289,7 +289,7 @@ JarqueBera.test(r1_int)
 # Prueba de Ljung-Box
 p_valores_box1_int <- tibble(
   lag = 5:36, 
-  p_valores = sapply(5:36, function(i) Box.test(r1_int, lag = i, fitdf = 4, type = "Ljung-Box")$p.value)
+  p_valores = sapply(5:36, function(i) Box.test(r1_int, lag = i, fitdf = 7, type = "Ljung-Box")$p.value)
   )
 
 p_valores_box1_int %>%
@@ -769,7 +769,10 @@ En la figura \@ref(fig:espectro) se presenta la estimación no paramétrica del 
 
 spectrum(manzana_train,  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
 
-# Que es la linea azul, un IC?
+
+spectrum(diff(manzana_train),  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
+
+
 ```
 
 
@@ -860,10 +863,11 @@ Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados
 Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza, por lo que la evidencia está a favor de que su media incondicional es 0.
 
 ```{r}
-#t.test(r1, mu = 0) No usamos el t-test porque no se cumple el supuesto de normalidad
+t.test(r1, mu = 0) # No usamos el t-test porque no se cumple el supuesto de normalidad?
 
 # Alternativa para no tener que suponer normalidad, test no paramétrico de Wilcoxon
-wilcox.test(r1, mu = 0)
+# tener en cuenta que hay dependencia temporal
+#wilcox.test(r1, mu = 0)
 
 ```
 
@@ -978,7 +982,11 @@ Adicionalmente resulta de importancia cuantificar la incertidumbre que tenemos s
 
 Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a distintas medidas de error, cada cual con sus particularidades. 
 
-La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico (generalmente se minimiza el RMSE para obtener las predicciones). Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $\e_t = $  
+La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico (generalmente se minimiza el RMSE para obtener las predicciones). Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $e_s =  Y_{t+s} - Y^*_{t+s|t}$: 
+
+* Raíz del error cuadrático medio (RMSE) = $\sum_{i=1}^s e_i^2$
+
+* Error absoluto medio (MAE) = $\sum_{i=1}^s |e_i|$
 
 
 ```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
