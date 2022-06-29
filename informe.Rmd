@@ -58,14 +58,13 @@ Se cuentan con los datos desde enero de 2013 a mayo de 2022  y se considerará e
 
 Resulta de particular interés al modelizar los precios de este alimento de importancia la predicción, debido a la incidencia que pueden tener aumentos o bajas en los precios en el consumo de los uruguayos.
 
-
-```{r plot_precios, fig.cap="Serie de precios mensuales del Kg de manzana en pesos uruguayos.", include = TRUE}
+```{r plot_precios, fig.cap="Serie de precios mensuales del Kg de manzana en pesos uruguayos.", include=TRUE}
 autoplot(manzana) +
   theme_bw() +
-  labs(x = "Tiempo (Años)",  y = "Precio promedio ($UY por Kg)" )
+  labs(x = "Tiempo (Años)",  y = "Precio promedio ($UY por Kg)")
 ```
 
-En la figura \@ref(fig:plot_precios) se presenta el gráfico de la serie a ser trabajada. La impresión inicial que da es que la serie presenta cierto patrón estacional anual, donde los precios comienzan altos para luego descender hasta el segundo trimeste de los años y luego tienden a elevarse hasta el final de año. Esto se puede observar mejor en el gráfico de los precios coloreados por año y el gráfico de la evolución de los precios año a año por mes de la figura \@ref(fig:plot_precios_seas). El año 2020 presenta precios atípicamente altos y un comportamiento marcadamente distinto al de los otros años, no se observa la caída inicial de precios sino un aumento sostenido. Esto se puede deber al impacto económico que causó la pandemia de Coronavirus, que llegó a nuestro país en dicho año. Ya para 2021 y lo que va de 2022 parece haber una vuelta a patrones previos. Todo esto deberá ser tenido en cuenta a la hora de la especificación de un modelo del tipo ARIMA/SARIMA.
+En la figura \@ref(fig:plot_precios) se presenta el gráfico de la serie a ser trabajada. La impresión inicial que da es que la serie presenta cierto patrón estacional anual, donde los precios comienzan altos para luego descender hasta el segundo trimestre de los años y luego tienden a elevarse hasta el final de año. Esto se puede observar mejor en el gráfico de los precios coloreados por año y el gráfico de la evolución de los precios año a año por mes de la figura \@ref(fig:plot_precios_seas). El año 2020 presenta precios atípicamente altos y un comportamiento marcadamente distinto al de los otros años, no se observa la caída inicial de precios sino un aumento sostenido. Esto se puede deber al impacto económico que causó la pandemia de Coronavirus, que llegó a nuestro país en dicho año. Ya para 2021 y lo que va de 2022 parece haber una vuelta a patrones previos. Todo esto deberá ser tenido en cuenta a la hora de la especificación de un modelo del tipo ARIMA/SARIMA.
 
 ```{r plot_precios_seas, fig.cap="Serie de precios mensuales del Kg de manzana en pesos Uruguayos.", include = TRUE}
 a <- ggseasonplot(manzana) +
@@ -81,19 +80,7 @@ grid.arrange(a, b, nrow = 1)
 ```
 
 
-
-```{r descomp, include=TRUE}
-# Ver si incluir y en qué parte
-
-descomp <- stl(manzana, s.window = 13)
-
-autoplot(descomp) +
-  theme_bw()
-```
-  
-Para ahondar en el análisis descriptivo se realiza la descomposición de la serie en tendencia/ciclo, estacionalidad y componente irregular. En la figura \@ref(fig:descomp) se presentan las series de los componentes resultado de una descomposición mediante _STL_ (Seasonal Trend Descomposition using LOESS) por separado. 
-
-<!-- Explicar STL -->
+Para ahondar en el análisis descriptivo se realizó la descomposición de la serie en tendencia/ciclo, estacionalidad y componente irregular. En la figura \@ref(fig:descomp) del anexo se presentan las series de los componentes resultado de una descomposición mediante _STL_ (Seasonal Trend Descomposition using LOESS) por separado. Esta metodología consiste en suavizaciones recursivas de la serie basadas en regresiones  y un sistema de pesos [@cleveland_1990]. 
 
 Se puede apreciar una marcada estacionalidad anual y en los últimos 6 años un ciclo corto que se repite cada dos años. La fuerza de la estacionalidad, definida como [@hyndman2018]:
 
@@ -758,22 +745,25 @@ Por otro lado, en la PACF se aprecia que los valores para los primeros dos lags 
 
 ### Dominio de las frecuencias
 
-
 Desde la perspectiva del dominio de las frecuencias de la serie se considera esta última en su expresión trigonométrica, mediante una suma ponderada de funciones periódicas coseno y seno. El espectro poblacional puede resultar de utilizad para observar la estructura de variabilidad de la serie, dado que el área por debajo del mismo es la variabilidad asociada a las frecuencias consideradas.
 
 En la figura \@ref(fig:espectro) se presenta la estimación no paramétrica del espectro poblacional de la serie de precios de manzana trabajada. En esta estimación se hace uso del periodograma muestral, que es la estimación del espectro poblacional a partir de las autocovarianzas muestrales y luego se realiza un promedio ponderado de sus valores mediante un _kernel_ a fines de suavizar el resultado, que en general resulta difícil de interpretar inicialmente. En este caso se pondera con el _kernel_ de Daniell modificado ponderando de a 3 valores del periodograma muestral 2 veces sucesivas. Se puede apreciar como las frecuencias menores, aquellas asociadas a periodos más largos (teniendo en cuenta que $p =2\pi/w$, siendo $p$ el periodo y $w$ la frecuencia) son aquellas que acumulan mayor variabilidad. Esto puede considerarse como otro indicio de una dependencia temporal estacional entre las observaciones de la muestra.
 
-```{r espectro, includo = TRUE, fig.cap="Periodograma muestral, estimación no paramétrica. 3 spans aplicados 2 veces."}
+```{r espectro, include = TRUE, fig.cap="Periodograma muestral, estimación no paramétrica. 3 spans aplicados 2 veces."}
 # Estimación del espectro.
 # Al agregar spans se está considerando la estimación no paramétrica.
+spec <- spectrum(manzana_train,  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
+spec_dif <- spectrum(diff(manzana_train),  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
 
-spectrum(manzana_train,  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
+#grid.arrange(spec, spec_dif)
 
+# max_locales <- head(which(diff(sign(diff(asd$spec)))==-2)+1, 3)
+# 
+# w_max_loc <- spec_dif$freq[max_locales]
 
-spectrum(diff(manzana_train),  spans = c(3, 3), main = "", xlab  = "Frecuencia", ylab = "Espectro", ci.col=NULL)
-
-
+# 2*pi/w_max_loc
 ```
+
 
 
 ### Tests de raíces unitarias
@@ -860,7 +850,7 @@ Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados
 
 ### Media 0 de los residuos
 
-Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza, por lo que la evidencia está a favor de que su media incondicional es 0.
+Para poner a prueba este supuesto se realiza el contraste de Wilcoxon, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. Este es un test de rangos no paramétrico en el cual no se necesita hacer el supuesto de normalidad, a diferencia de las pruebas con el estadístico t. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza, por lo que la evidencia está a favor de que su media incondicional es 0.
 
 ```{r}
 t.test(r1, mu = 0) # No usamos el t-test porque no se cumple el supuesto de normalidad?
@@ -871,7 +861,6 @@ t.test(r1, mu = 0) # No usamos el t-test porque no se cumple el supuesto de norm
 
 ```
 
-Con el test de Wilcoxon no rechazamos la hipótesis nula de que la media de los residuos es igual a 0, por lo cual este supuesto se cumple.
 
 ### Incorrelación de los errores
 
@@ -996,14 +985,14 @@ Para enfrentarse a las problemáticas de las medidas de error antes presentadas,
 
 Error escalado absoluto medio (MASE) = $\sum_{i=1}^s|q_i|$
 
-### Predicción dentro de la muestra
+## Predicción dentro de la muestra de entrenamiento
 
 Como una forma de medir el ajuste del modelo a la serie trabajada en general se calculan las predicciones a un paso del modelo dentro de la muestra de entrenamiento, comparándose con el valor verdadero de la serie. Hay que tener en cuenta que el modelo con el que se hacen estas predicciones es ajustado con todos los datos y no con los que se tienen al momento de la predicción, por lo que no resulta una buena referencia para evaluar el modelo en cuanto a sus predicciones fuera de la muestra.
 
-En la figura \@ref(fig:errortrain) se presentan los valores de las medidas planteadas evaluadas dentro de la muestra para los cinco modelos seleccionados. Si bien las diferencias no son substanciales, se puede observar que el modelo con ajuste de outliers automático _modelo_tso_ presenta el mejor desempeño en todas las medidas (si bien su escala es distinta porque no toma en cuenta diferencias como los otros SARIMA, las predicciones son consideradas a niveles). El que le sigue es el _modelo_aicc_int_. Hay que tomar en cuenta que ambos modelos tienen múltiples intervenciones (el primero 7 y el segundo 4), algunas estando al final de la muestra, lo cual puede tener efectos negativos sobre la predicción. 
+En la figura \@ref(fig:errortrain) se presentan los valores de las medidas planteadas evaluadas dentro de la muestra para los cinco modelos seleccionados. Si bien las diferencias no son substanciales, se puede observar que el modelo con ajuste de outliers automático _modelo_tso_ presenta el mejor desempeño en todas las medidas (si bien su escala es distinta porque no toma en cuenta diferencias como los otros SARIMA, las predicciones son consideradas a niveles, por lo que se pueden emplear todas las medidas). El que le sigue es el _modelo_aicc_int_. El modelo identificado de manera manual y el obtenido mediante el AICc tienen un desempeño muy similar. 
 
 
-```{r errortrain, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
+```{r errortrain, include=TRUE, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
 errores_train <- rbind(
   "modelo_manual"=medidas_error1[1,c(2,3,5,6)],
   "modelo_aicc"=medidas_error2_boot[1,c(2,3,5,6)],
@@ -1022,7 +1011,13 @@ errores_train %>%
 
 ```
 
-```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de testeo."}
+## Predicción fuera de la muestra de entrenamiento
+
+Una forma de evaluar las predicciones que busca simular el proceso de predecir al futuro pero teniéndose la posibilidad de evaluar la calidad de las predicciones es mediante la predicción fuera de la muestra de entrenamiento. En este caso se predice a 12 pasos (a un año dado que se trabaja con datos mensuales) y se compara con los 12 valores que se apartaron para conformar la muestra de prueba. Luego, se evalúan las medidas de error anteriormente discutidas.
+
+Tomando en cuenta esta forma de medir los errores, ahora el modelo con mejor desempeño en todas las medidas es el seleccionado mediante el AICc sin intervenciones por atípicos (Ver figura \@ref(fig:errortest)). Por otra parte, cabe destacar como los modelos intervenidos, que antes eran los de mejor desempeño dentro de la muestra, ahora presentan el peor desempeño, siendo el modelo seleccionado mediante el AICc e intervenido el que peor predice a 12 pasos. La conclusión que se puede hacer de esto es que no necesariamente el mejor ajuste dentro de la muestra tendrá como resultado una mejor predicción fuera de ella y que incluso se puede estar incurriendo en un sobreajuste. También debe ser tenido en cuenta que en ambos modelos intervenidos se identificaron outliers del tipo TC hacia el final de la muestra empleada para la estimación, lo cual tiene un efecto que perdura en el horizonte predictivo considerado. 
+
+```{r errortest, include=TRUE, results='asis', fig.cap="Errores de los distintos modelos en la muestra de testeo."}
 errores_test <- rbind(
   "modelo_manual"=medidas_error1[2,c(2,3,5,6)],
   "modelo_aicc"=medidas_error2_boot[2,c(2,3,5,6)],
@@ -1040,13 +1035,79 @@ errores_test %>%
 
 ```
 
+Para visualizar las diferentes predicciones en la figura \@ref(fig:plot_predicciones) se presentan sus valores puntuales junto al verdadero valor que tomaron los precios. Se puede observar como las predicciones captan el comportamiento de los precios (por ejemplo, el pico de comienzos de 2022), con la excepción de _modelo_aicc_int_ y _modelo_manual_ , a pesar de que este último es el segundo mejor en términos de medidas de error. Salta a la vista que si bien se consideró la predicción a 12 pasos, una predicción con un horizonte más corto puede arrojar resultados distintos en cuanto al modelo con mejor desempeño.
 
-Notar que el modelo intervenido por tso está sobreajustado (capaz)  y por eso cumple todos los supuestos tan bien pero predice mal.
+```{r plot_predicciones, include = TRUE, fig.cap= "Predicciones a 12 pasos del precio de manzana, muestra de prueba."}
+ggplot() +
+  autolayer(tail(manzana, 36), series="Serie original", size=1) +
+  autolayer(prediccion1$mean, series="modelo_manual") +
+  autolayer(prediccion2_boot$mean, series="modelo_aicc") +
+  autolayer(prediccion2$mean, series="modelo_aicc_int") +
+  autolayer(prediccion_tso$mean, series="modelo_tso") +
+  autolayer(prediccion_ets$mean, series="modelo_ets") +
+  xlab("Tiempo") +
+  ylab("Precio ($UY)") +
+  labs(color = "") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw()
+
+```
+
+En la figura \@ref(fig:preds) se presentan las predicciones a 12 pasos junto a sus respectivos intervalos de predicción al 80% de confianza del modelo de mejor desempeño predictivo; el seleccionado mediante AICc (_modelo_aicc_), y el identificado manualmente (_modelo_manual_), que fue el segundo con mejor desempeño predictivo. 
+
+Se puede observar que a simple vista _modelo_aicc_ captura mejor el comportamiento de la serie real y de hecho su error es menor. No obstante, sus intervalos de predicción al 80% son más amplios que los de _modelo_manual_, que puede hacer que inicialmente nos inclinemos por este último modelo, aunque el primer valor de la muestra de prueba cae fuera de su intervalo (por $0.01). Ambos son obtenidos mediante bootstrap, por lo que se puede afirmar que hay una mayor incertidumbre asociada al primero de estos modelos. 
+
+Como es de esperarse, al alejarse la predicción del último valor de la serie que se empleó para estimar los intervalos crecen en amplitud. Hacia el final del horizonte predictivo, en el paso 12, el de _modelo_aicc_ va de 1.05 a 63.6; amplitud que resulta muy amplia pero es entendible al haber tantos factores fuera de control en un lapso de tiempo tan largo. 
+
+```{r preds, include=TRUE, fig.cap="Predicciones puntuales del precio de manzana e intervalos de predicción al 80%."}
+
+manzana_tbbl <- tibble(
+  fecha = seq(as.Date("2013-01-01"), as.Date("2022-05-01"), by = "month"),
+  precio = as.numeric(manzana),
+)
+
+pred_tbbl <- tibble(
+  fecha = seq(as.Date("2021-06-01"), as.Date("2022-05-01"), by = "month"),
+  pred_manual = prediccion1$mean,
+  pred_manual_IC80lwr = prediccion1$lower[,4],
+  pred_manual_IC80uppr = prediccion1$upper[,4],
+  pred_AICc = prediccion2_boot$mean,
+  pred_AICc_IC80lwr = prediccion2_boot$lower[,4],
+  pred_AICc_IC80uppr = prediccion2_boot$upper[,4]
+) 
+
+  
+ggplot() +
+  geom_line(data = tail(manzana_tbbl, 36), aes(x = fecha, y = precio)) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual, color = "modelo_manual")) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc, color = "modelo_aicc")) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80lwr, color = "modelo_manual"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80uppr, color = "modelo_manual"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80lwr, color = "modelo_aicc"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80uppr, color = "modelo_aicc"), lty = "dashed") +
+  xlab("Tiempo") +
+  ylab("Precio ($UY x Kg)") +
+  labs(color = "", linetype = "Serie") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw()
+```
 
 # Conclusiones
 
+
+
 # Anexo
 
+## Descomposición STL
+
+```{r descomp, include=TRUE}
+descomp <- stl(manzana, s.window = 13)
+
+autoplot(descomp) +
+  theme_bw()
+```
+
+## ACF a niveles
 ```{r acf1, fig.cap="Funciones de autocorrelación y autocorrelación parcial muestrales de la serie de precios de manzana.", include = TRUE}
 grid.arrange(plot_acf1, plot_pacf1)
 ```
