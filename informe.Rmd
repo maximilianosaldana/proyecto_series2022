@@ -35,6 +35,7 @@ library(tsoutliers)
 library(urca)
 library(lmtest)
 library(TSA)
+library(xtable)
 ```
 
 ```{r datos}
@@ -259,15 +260,15 @@ JarqueBera.test(r1)
 
 outliers1 <- r1[(r1 < quantile(r1, 0.25) - 3*IQR(r1)) | (r1 > quantile(r1, 0.75) + 3*IQR(r1))]
     
-outliers1_index <- which(r1 == outliers1[1] | r1 == outliers1[2])
+outliers1_index <- which(r1 %in% outliers1)
 
 
 # Probamos con insertar dummies, atípico AO o TC
 
-outliers <- outliers(c("AO", "AO"), outliers1_index) #Probamos tanto con dos AO como con un TC, y los resultados son "similares"
+outliers <- outliers(c("TC", "AO", "AO"), outliers1_index) #Probamos tanto con dos AO como con un TC, y los resultados son "similares"
 outliers_effect <- outliers.effects(outliers, n = length(manzana_train))
 
-modelo1_int <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA, NA, NA), xreg = outliers_effect)
+modelo1_int <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA, NA, NA, NA), xreg = outliers_effect)
 
 lmtest::coeftest(modelo1_int)
 
@@ -298,48 +299,8 @@ p_valores_box1_int %>%
   ylab("p-valor")
 
 
-# Se rechaza la hipótesis nula de autocorrelación
+# Se rechaza la hipótesis nula de autocorrelación, que antes se cumplía, por lo tanto no seguimos interviniendo
 
-# VER DE BORRAR LO DE ABAJO, YA DESDE ACÁ N OSE CUMPLE NO AUTOCORRELACIÓN!!!!!!!!!!!!!!!!
-
-# # Relajamos el criterio de outliers, porque sino no lo capta
-# outliers1_int <- r1_int[r1_int < quantile(r1_int, 0.25) - 2.5*IQR(r1_int) | r1_int > quantile(r1_int, 0.75) + 2.5*IQR(r1_int)]
-#     
-# outliers1_int_index <- which(r1_int == outliers1_int)
-# 
-# # Incluimos un AO
-# tipos_outliers_int <- outliers(c("AO", "AO", "AO"), c(outliers1_index, outliers1_int_index))
-# 
-# outliers_effect_int <- outliers.effects(tipos_outliers_int, n = length(manzana_train))
-# 
-# 
-# modelo1_int2 <- Arima(manzana_train, order = c(2, 1, 0), seasonal = c(2, 0, 0), fixed=c(NA, NA, 0, NA, NA, NA, NA), xreg = outliers_effect_int)
-# 
-# r1_int2 <- residuals(modelo1_int2)
-# 
-# autoplot(r1_int2)
-# 
-# 
-# # Tests de normalidad
-# shapiro.test(r1_int2)
-# JarqueBera.test(r1_int2)
-# 
-# # No se rechaza la normalidad!
-# 
-# ## Prueba de Ljung-Box 
-# p_valores_box1_int2 <- tibble(
-#   lag = 4:36, 
-#   p_valores = sapply(4:36, function(i) Box.test(r1_int2, lag = i, fitdf = 3 ,type = "Ljung-Box")$p.value)
-#   )
-# 
-# # Se rechaza la hipótesis nula de autocorrelación al 5%, intervenimos demasiado.
-# p_valores_box1_int2 %>% 
-#   ggplot(aes(lag, p_valores)) +
-#   geom_hline(yintercept = 0.05, color = "red") +
-#   geom_point()+
-#   theme_bw() +
-#   xlab("Rezago") +
-#   ylab("p-valor")
 
 # Predicción --------------------------------------------------------------------------------------------------
 
@@ -399,6 +360,8 @@ p_valores_box %>%
   xlab("Rezago") +
   ylab("p-valor")
 
+#Test de media nula
+wilcox.test(r2) #no se rechaza la hipótesis nula de media 0
 
 # Test de heteroscedasticidad
 test_mcleodli2 <- McLeod.Li.test(modelo2)
@@ -519,6 +482,8 @@ p_valores_box2_int3 %>%
 # Test de heteroscedasticidad
 test_mcleodli2_3 <- McLeod.Li.test(modelo2_int3)
 
+# Test de media nula
+wilcox.test(r2_int3)
 
 # Predicción --------------------------------------------------------------------
 
@@ -893,13 +858,14 @@ Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados
 Para poner a prueba este supuesto se realiza una prueba con el estadístico t, donde se testea $H_0) \mu_{\varepsilon} = 0$ contra $H_1) \mu_{\varepsilon} = 0$. En el caso de la muestra no se rechaza la hipótesis nula al 99% de confianza, por lo que la evidencia está a favor de que su media incondicional es 0.
 
 ```{r}
-t.test(r1, mu = 0)
+#t.test(r1, mu = 0) No usamos el t-test porque no se cumple el supuesto de normalidad
 
-# Alternativa para no tener que suponer normalidad?
-# wilcox.test(r1, mu = 0)
+# Alternativa para no tener que suponer normalidad, test no paramétrico de Wilcoxon
+wilcox.test(r1, mu = 0)
 
 ```
 
+Con el test de Wilcoxon no rechazamos la hipótesis nula de que la media de los residuos es igual a 0, por lo cual este supuesto se cumple.
 
 ### Incorrelación de los errores
 
@@ -949,19 +915,79 @@ Estas pruebas son particularmente sensibles a la presencia de valores atípicos,
 
 En efecto, recurriendo a ambos contrastes se rechaza la hipótesis nula de normalidad al 95% de confianza, por lo que se recurrió a incorporar el efecto de los atípicos en el _modelo manual_. 
 
+```{r, include=FALSE}
+# Test de normalidad de Shapiro-Wilks y Jarque-Bera para el modelo 1
+shapiro.test(r1)
+JarqueBera.test(r1)
+```
+
+### Intervención
+
+Dado que el _modelo manual_ no cumple con el supuesto de normalidad, y atribuimos esto a la presencia de algunos outliers, optamos por realizar una intervención a dichos outliers para intentar corregir el no cumplimiento de este supuesto. Para ello, consideramos como outliers a los residuos $e_t$ que no se encuentran en el intervalo $(Q_1-3IQR,Q_3+3IQR)$ @hyndsight. Siguiendo esta metodología, los outliers son los valores correspondientes a enero y febrero de 2017, así como a marzo de 2021. Optamos por considerar al residuo de enero de 2017 como un outlier del tipo de cambio transitorio (TC), y a los otros dos como outliers aditivos (AO). Los primeros representan un impacto cuyo efecto decae progresivamente a lo largo de un período determinado, mientras que los segundos consideran un impacto en esa observación puntual donde se observa. Incluimos estas intervenciones como regresores del modelo, y luego de testear la significación de sus  parámetros comprobamos que los mismos son significativos al 5%, por lo cual conservamos estas intervenciones en el modelo. 
+
+Nuevamente se pusieron a prueba los supuestos para el modelo intervenido, y si bien en este caso se cumple el supuesto de normalidad, no se cumple el supuesto de no autocorrelación de los residuos, que sí se cumplía para el modelo sin intervenir. Por lo tanto, optamos por deshechar la intervención y mantener el modelo manual sin intervenir, dado que si bien para este no se cumple la normalidad, eso se puede subsanar utilizando bootstrap para la estimación de los intervalos de predicción, el cual es una técnica que consiste en estimar la varianza de los datos a partir de un remuestreo de los datos observados.
+
+### Modelos alternativos
+
+Una vez se llegó al final de la etapa de diagnóstico del modelo planteado de forma manual, optamos por evaluar otros modelos alternativos seleccionados a partir de métodos automáticos, para tener varias opciones a la hora de evaluar el desempeño de las predicciones y compararlos con el modelo manual.
+
+
+
+#### Modelo seleccionado por AICc
+
+Se seleccionó un modelo utilizando el Criterio de Información de Akaike  corregido ($AICc$), en adelante _modelo_aicc_, que tiene la forma $ARIMA(0,1,2)(0,0,2)$. Al realizar los contrastes de significación de los parámetros observamos que los parámetros de medias móviles son significativos, así como el parámetro de medias móviles estacionales de segundo orden, pero no el de primer orden. En cuanto a los supuestos sobre los residuos, al igual que sucedía para el _modelo_manual_, no se rechaza la hipótesis de no autocorrelación ni tampoco la de media nula, pero la homocedasticidad no se cumple para todos los rezagos, y se rechaza la hipótesis de normalidad.
+
+Luego, se realizó una intervención sobre este modelo para corregir el efecto de algunos outliers que se detectaron, y se llegó a un modelo que cumple todos los supuestos sobre los residuos (excepto el de homocedasticidad para algunos rezagos).
+
+#### Modelo seleccionado por _tso_
+
+Se seleccionó otro modelo a partir de las intervenciones aplicadas con el procedimiento automático de detección de outliers de la función _tso_ presente en el paquete _tsoutliers_ (_modelo_tso_). El resultado del mismo es un $ARIMA(0,1,1)(2,0,0)$, que tiene 7 intervenciones (5 TC y 2 AO), esto último se debe a que al ejecutar el algoritmo se restringió el tipo de outliers posibles a estos dos, luego de haber obtenido malos resultados incluyendo también outliers del tipo cambio de nivel (LS). Todos los parámetros son significativos, excepto el correspondiente a la estacionalidad autorregresiva de orden 1. Por otro lado, se cumplen todos los supuestos que se suelen pedir sobre los residuos, incluyendo el de la homocedasticidad para todos los rezagos (que en modelos anteriores no se cumplía).
+
+#### Modelo seleccionado por _tsoutliers_
+
+Otra opción considerada es la de un modelo intervenido con por métodos de la función _tsoutliers_ del paquete _forecast_, que reemplaza los outliers a través de interpolación lineal (_modelo_clean_). En este caso, se selecciona un modelo $ARIMA(1,1,0)(2,0,0)$, cuyo parámetros son significativos excepto el autorregresivo estacional de orden 1, pero que no cumple los supuestos de normalidad y no autocorrelación de los residuos, por lo cual optamos por no utilizarlo.
+
+#### Modelo seleccionado por _ets_
+
+Finalmente se selecciona un modelo de una clase distinta a los $ARIMA$, de la familia de los de suavizado exponencial, que hacen uso de promedios ponderados de las observaciones (_modelo_ets_), y tienen como base modelos estructurales o espacio-estado. Este tipo de modelos permiten una estructura de varianzas que cambia en el tiempo, por lo cual no se requiere el supuesto de homocedasticidad de los residuos. Por su parte, el supuesto de no autocorrelación de los mismos sí se cumple.
 
 
 # Predicción
 
-<!-- Realizaremos predicción para los siguientes modelos, que son los que mejor cumplen los supuestos: -->
+```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
+rbind(
+  "modelo_manual"=medidas_error1[1,c(2,3,5,6)],
+  "modelo_aicc"=medidas_error2_boot[1,c(2,3,5,6)],
+  "modelo_aicc_int"=medidas_error2[1,c(2,3,5,6)],
+  "modelo_tso"=medidas_error_tso[1,c(2,3,5,6)],
+  "modelo_ets"=medidas_error_ets[1,c(2,3,5,6)]
+) %>% 
+  as_tibble() %>% 
+  mapply(FUN=function(x) format(x,digits=2)) %>% 
+  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.) %>% 
+  xtable() %>% 
+  print.xtable(include.rownames = FALSE)
 
-<!-- * **modelo_tso:** Modelo intervenido con el procedimiento automático de detección de outliers del paquete _tso_. Cumple tanto el supuesto de no autocorrelación de los residuos como el supuesto de normalidad. -->
+```
 
-<!-- * **modelo_clean:** Modelo intervenido con por métodos del paquete _tsoutliers_, que reemplaza los mismos a través de interpolación lineal. Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad. -->
+```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de testeo."}
+rbind(
+  "modelo_manual"=medidas_error1[2,c(2,3,5,6)],
+  "modelo_aicc"=medidas_error2_boot[2,c(2,3,5,6)],
+  "modelo_aicc_int"=medidas_error2[2,c(2,3,5,6)],
+  "modelo_tso"=medidas_error_tso[2,c(2,3,5,6)],
+  "modelo_ets"=medidas_error_ets[2,c(2,3,5,6)]
+) %>% 
+  as_tibble() %>% 
+  mapply(FUN=function(x) format(x,digits=2)) %>% 
+  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.) %>% 
+  xtable() %>% 
+  print.xtable(include.rownames = FALSE)
 
-<!-- * **modelo_tbats:** Modelo TBATS (explicar más). Cumple el supuesto de no autocorrelación de los residuos, pero no el supuesto de normalidad (la única hipótesis nula que no se rechaza en este sentido es la de asimetría). -->
+```
 
 
+Notar que el modelo intervenido por tso está sobreajustado (capaz)  y por eso cumple todos los supuestos tan bien pero predice mal.
 
 # Conclusiones
 
