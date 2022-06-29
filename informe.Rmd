@@ -56,6 +56,8 @@ La serie a ser estudiada es la de precios promedio mensuales del kilo de manzana
 
 Se cuentan con los datos desde enero de 2013 a mayo de 2022  y se considerará el promedio mensual de los precios, por lo que se cuentan con 113 observaciones. En lugar de emplear los datos bisemanales o el promedio semanal se opta por la frecuencia mensual debido a la dificultad de emplear el herramental de los modelos SARIMA para tales tipos de series, en particular para el tratamiento de la estacionalidad.
 
+Resulta de particular interés al modelizar los precios de este alimento de importancia la predicción, debido a la incidencia que pueden tener aumentos o bajas en los precios en el consumo de los uruguayos.
+
 
 ```{r plot_precios, fig.cap="Serie de precios mensuales del Kg de manzana en pesos uruguayos.", include = TRUE}
 autoplot(manzana) +
@@ -901,13 +903,13 @@ McLeod.Li.test(modelo1, omit.initial = TRUE)
 En la figura \@ref(fig:mcleodli) se presentan los valores de los p-valores de la prueba para los primeros 19 rezagos. Se puede apreciar que considerando en conjunto hasta el décimo rezago hay presencia de heteroscedasticidad. Esto es una indicación que los modelos del tipo SARIMA puede no ser los más adecuados y se tendría que recurrir a los del tipo ARCH/GARCH donde se busca modelizar la varianza de los errores.
 
 
-### Normalidad
+### Normalidad {#norm}
 
 Finalmente, se evalúa si el modelo cumple el supuesto de que sus residuos tienen una distribución gaussiana. Este supuesto entra en juego en particular a la hora de calcular intervalos de predicción, que expresan la incertidumbre que se tiene respecto a la predicción puntual realizada. En caso de que se cumpla la normalidad los intervalos de confianza al $(1-\alpha)\%$ para la predicción a $s$ pasos podrán ser calculados con la fórmula:
 
-$$\hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{E[Y_t+s-E(Y_{t+s}|\varepsilon_t,\varepsilon_{t-1},\dots)]^2} = \hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{\sigma^2(1+\sum_{j=1}^{s-1}\Psi_j^2)}$$
+$$\hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{E[Y_{t+s}-E(Y_{t+s}|\varepsilon_t,\varepsilon_{t-1},\dots)]^2} = \hat{Y}_{t+s}|Y_t \pm z_{\alpha/2}\sqrt{\sigma^2(1+\sum_{j=1}^{s-1}\Psi_j^2)}$$
 
-Donde $\hat{Y}_{t+s}$ es la predicción puntual, $z_{\alpha/2}$ es el percentil $\alpha/2$ de una distribución normal, $\sigma^2$ es la varianza de los errores y $\Psi_j$ es el j-ésimo parámetro de la representación $AR(\infty)$ del modelo (que siempre es posible hallarla cuando el modelo es estacionario por el teorema de Wold [@notas_series]).
+Donde $\hat{Y}_{t+s}$ es la predicción puntual, $z_{\alpha/2}$ es el percentil $\alpha/2$ de una distribución normal, $\sigma^2$ es la varianza de los errores y $\Psi_j$ es el j-ésimo parámetro de la representación $MA(\infty)$ del modelo (que siempre es posible hallarla cuando el modelo es estacionario por el teorema de Wold [@notas_series]).
 
 Fueron creadas múltiples formas de contrastar la normalidad, dos de ellas aplicadas en el presente trabajo son los contrastes de Jarque-Bera y de Shapiro-Wilk. Ambas contrastan las hipótests $H_0) \varepsilon_t \sim N(0, \sigma^2)$ versus $H_0) \varepsilon_t \nsim N(0, \sigma^2)$, pero difieren en la forma que lo hacen. En el caso de Jarque-Bera, se calculan los coeficientes de simetría y curtosis de los residuos para contrastarlos con los de una distribución normal teórica. Por otro lado, el test de Shapiro-Wilk fue desarrollado en @shapiro_wilk_1965 y sigue el enfoque del análisis de varianza y hace uso de un estadístico cuyos valores críticos son calculados mediante simulación Monte-Carlo.
 
@@ -921,7 +923,7 @@ shapiro.test(r1)
 JarqueBera.test(r1)
 ```
 
-### Intervención
+### Intervención {#inter}
 
 Dado que el _modelo manual_ no cumple con el supuesto de normalidad, y atribuimos esto a la presencia de algunos outliers, optamos por realizar una intervención a dichos outliers para intentar corregir el no cumplimiento de este supuesto. Para ello, consideramos como outliers a los residuos $e_t$ que no se encuentran en el intervalo $(Q_1-3IQR,Q_3+3IQR)$ @hyndsight. Siguiendo esta metodología, los outliers son los valores correspondientes a enero y febrero de 2017, así como a marzo de 2021. Optamos por considerar al residuo de enero de 2017 como un outlier del tipo de cambio transitorio (TC), y a los otros dos como outliers aditivos (AO). Los primeros representan un impacto cuyo efecto decae progresivamente a lo largo de un período determinado, mientras que los segundos consideran un impacto en esa observación puntual donde se observa. Incluimos estas intervenciones como regresores del modelo, y luego de testear la significación de sus  parámetros comprobamos que los mismos son significativos al 5%, por lo cual conservamos estas intervenciones en el modelo. 
 
@@ -954,33 +956,63 @@ Finalmente se selecciona un modelo de una clase distinta a los $ARIMA$, de la fa
 
 # Predicción
 
+Una vez se cuenta con un modelo (o una selección de modelos) que se suponen correctos, tanto en especificación como en estimación, se puede proceder a la predicción de los valores futuros de la serie condicionando a los valores con los cuales se cuenta. Para los datos empleados, los precios mayoristas de manzana, resulta de particular interés la predicción a futuro, dado que lo que ocurra con el precio incidirá tanto en la producción como en el consumo del bien y puede ser un insumo para la toma de decisiones a nivel de política económica.
+
+## Predicción puntual 
+
+Se busca tener una predicción puntual de los precios y uno o varios intervalos de confianzas (para considerar distintos niveles de confianza). Para esto se va a partir de los modelos seleccionados y se va a buscar realizar una predicción optima, entendida como aquella que minimiza una función de pérdida. Esta función expresa el costo en el cual se incurre ante el error en la predicción y la idea es minimizar su valor esperado. 
+
+La función de costos que se empleará será la cuadrática, es decir $C(e) = a e^2$, donde $a$ es una constante positiva y $e$ el error. Este tipo de función penaliza en mayor medida los errores de gran magnitud más que los pequeños. Minimizar el valor esperado de esta función implica minimizar el error cuadrático medio a un horizonte predictivo de $s$ pasos, condicional a las $t$ observaciones con las que se cuenta:
+
+$$E(Y_{t+1}-Y^*_{t+1|t})^2$$
+Como resultado de la minimización de la expresión anterior, se llega a que la predicción óptima es la esperanza condicional, es decir: $Y^*_{t+1|t} = E(Y_{t+1}|Y_t)$. En el caso de un proceso SARIMA estacionario, se lo puede expresar como un $MA(\infty)$ y la expresión del pronóstico óptimo resultante es:
+
+$$\hat{E}[Y_{t+s} | \varepsilon_t, \varepsilon_{t-1}, \dots] = \psi_s\varepsilon_t + \psi_{s+1}\varepsilon_{t-1} + \psi_{s+2}\varepsilon_{t-2} + \dots$$
+
+## Intervalos de predicción 
+
+Adicionalmente resulta de importancia cuantificar la incertidumbre que tenemos sobre la predicción puntual mediante intervalos de predicción, los cuales se pueden interpretar como la dispersión de posibles resultados relativa a dichos valores puntuales calculados, para un nivel de confianza dado [@ericsson_2001]. En el caso que se cumpla el supuesto de normalidad, se puede emplear la expresión indicada en la sección \@ref{norm} y en caso contrario se pueden obtener mediante métodos de bootstrap (como se discutió en la sección \@ref{inter}).  
+
+
+## Medidas de error
+
+Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a distintas medidas de error, cada cual con sus particularidades. 
+
+La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico (generalmente se minimiza el RMSE para obtener las predicciones). Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $\e_t = $  
+
+
 ```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de entrenamiento."}
-rbind(
+errores_train <- rbind(
   "modelo_manual"=medidas_error1[1,c(2,3,5,6)],
   "modelo_aicc"=medidas_error2_boot[1,c(2,3,5,6)],
   "modelo_aicc_int"=medidas_error2[1,c(2,3,5,6)],
   "modelo_tso"=medidas_error_tso[1,c(2,3,5,6)],
   "modelo_ets"=medidas_error_ets[1,c(2,3,5,6)]
-) %>% 
+  ) %>% 
   as_tibble() %>% 
   mapply(FUN=function(x) format(x,digits=2)) %>% 
-  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.) %>% 
+  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.)
+
+
+errores_train %>% 
   xtable() %>% 
   print.xtable(include.rownames = FALSE)
 
 ```
 
 ```{r, results='asis', fig.cap="Errores de los distintos modelos en la muestra de testeo."}
-rbind(
+errores_test <- rbind(
   "modelo_manual"=medidas_error1[2,c(2,3,5,6)],
   "modelo_aicc"=medidas_error2_boot[2,c(2,3,5,6)],
   "modelo_aicc_int"=medidas_error2[2,c(2,3,5,6)],
   "modelo_tso"=medidas_error_tso[2,c(2,3,5,6)],
   "modelo_ets"=medidas_error_ets[2,c(2,3,5,6)]
-) %>% 
+  ) %>% 
   as_tibble() %>% 
   mapply(FUN=function(x) format(x,digits=2)) %>% 
-  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.) %>% 
+  cbind("Modelo"=c("modelo_manual", "modelo_aicc", "modelo_aicc_int", "modelo_tso", "modelo_ets"),.) 
+
+errores_test %>% 
   xtable() %>% 
   print.xtable(include.rownames = FALSE)
 
