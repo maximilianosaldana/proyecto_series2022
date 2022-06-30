@@ -1116,6 +1116,7 @@ El hecho de que la predicción se haga con el trasfondo de la pandemia de Corona
 descomp <- stl(manzana, s.window = 13)
 
 autoplot(descomp) +
+  labs(x = "Tiempo (Año)") +
   theme_bw()
 ```
 

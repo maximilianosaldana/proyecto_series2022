@@ -1,0 +1,57 @@
+---
+title: "Modelización de serie de tiempo de precios mayoristas de manzana de Uruguay."
+author: "Emanuelle Marsella, Maximiliano Saldaña"
+date: "julio 2022"
+output: 
+  beamer_presentation:
+    theme: "CambridgeUS"
+    colortheme: "beaver"
+    fonttheme: "structurebold"
+    
+header-includes:
+  - \usepackage[spanish]{babel}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+## Introducción
+
+* Se busca modelizar empleando modelos SARIMA la serie de precios mayoristas de manzana que se comercian en la UAM.
+
+* La serie original es bisemanal, se agregan para tener una serie mensual.
+
+* Se tienen datos de 2013 a junio de este año.
+
+* El desempeño predictivo fuera de la muestra es de particular interés.
+
+## Descripción de la serie: Gráfico de la serie
+
+![Serie de los precios promedio mensuales de manzana.](precios.png){width=90%}
+
+## Descripción de la serie: Descomposición de la serie
+
+![Descomposición de la serie de precios mediante STL.](stl.png){width=90%}
+
+
+## Identificación: ACF y PACF
+
+![Descomposición de la serie de precios mediante STL.](stl.png){width=90%}
+
+## Identificación: transformación logarítmica
+
+* A simple esta transformación no parecería beneficiar el modelo.
+
+* La transformación de Box-Cox nos lleva a concluir lo mismo.  
+
+
+
+## Estimación: modelo manual
+
+
+
+
+
