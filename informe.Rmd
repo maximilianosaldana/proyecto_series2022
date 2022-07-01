@@ -1073,6 +1073,32 @@ pred_tbbl <- tibble(
   pred_AICc_IC80uppr = prediccion2_boot$upper[,4]
 ) 
 
+
+pred_train_tbbl <- tibble(
+  fecha = seq(as.Date("2013-01-01"), as.Date("2021-05-01"), by = "month"),
+  pred_manual = modelo1$fitted,
+  pred_AICc = modelo2$fitted,
+  reales = manzana_train
+) %>% 
+  mutate(
+   fecha = format(fecha, format = "%Y-%m"),
+    error_manual = reales - pred_manual,
+    error_AICc = reales - pred_AICc
+  )
+
+
+
+pred_tbbl_long <- pred_tbbl %>% 
+  pivot_longer(. , cols = pred_manual:pred_AICc_IC80uppr, names_to = c("Serie"), values_to = "precio") %>% 
+  mutate(
+    IC = case_when(
+      str_detect(Serie, "IC80lwr") ~ "IC80 inf.", 
+      str_detect(Serie, "IC80uppr") ~ "IC80 sup.",
+      TRUE ~ "Pred. puntual"
+    ),
+    modelo = ifelse(str_detect(Serie, "AICc") == TRUE, "Modelo AICc", "Modelo Manual")
+  )
+
 pred_tbbl1 <- pred_tbbl %>% 
   mutate(
     reales = manzana_test,
@@ -1085,15 +1111,41 @@ pred_tbbl1 <- pred_tbbl %>%
 
 ggplot() +
   geom_line(data = tail(manzana_tbbl, 36), aes(x = fecha, y = precio)) +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual, color = "modelo_manual")) +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc, color = "modelo_aicc")) +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80lwr, color = "modelo_manual"), lty = "dashed") +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80uppr, color = "modelo_manual"), lty = "dashed") +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80lwr, color = "modelo_aicc"), lty = "dashed") +
-  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80uppr, color = "modelo_aicc"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual, color = "Modelo manual")) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc, color = "Modelo AICc")) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80lwr, color = "Modelo manual"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80uppr, color = "Modelo manual"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80lwr, color = "Modelo AICc"), lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80uppr, color = "Modelo AICc"), lty = "dashed") +
   xlab("Tiempo") +
   ylab("Precio ($UY x Kg)") +
-  labs(color = "", linetype = "Serie") +
+  labs(color = "Serie", linetype = "Serie") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw() 
+
+
+
+ggplot() +
+  geom_line(data = tail(manzana_tbbl, 36), aes(x = fecha, y = precio)) +
+  geom_line(data = pred_tbbl_long , aes(x = fecha, y = precio, color = modelo, lty = IC)) + 
+  labs(color = "Serie", linetype = "Serie") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw() 
+
+
+
+
+ggplot() +
+  geom_line(data = tail(manzana_tbbl, 36), aes(x = fecha, y = precio)) +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual), color = "red") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc), color = "blue") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80lwr), color = "red", lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual_IC80uppr), color = "red", lty = "dashed") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80lwr, color = "Modelo AICc, IC 80%"), lty = "dashed", color = "blue") +
+  geom_line(data = pred_tbbl, aes(x = fecha, y = pred_AICc_IC80uppr, color = "Modelo AICc, IC 80%"), lty = "dashed", color = "blue") +
+  xlab("Tiempo") +
+  ylab("Precio ($UY x Kg)") +
+  labs(color = "Serie", linetype = "Serie") +
   scale_color_brewer(palette = "Dark2") +
   theme_bw() 
 ```
@@ -1101,17 +1153,21 @@ ggplot() +
 ```{r tabla-error}
 
 pred_tbbl1 %>% 
-  select(fecha, reales, pred_AICc, error_AICc, error_AICc_abs) %>% 
+  select(fecha, reales, pred_AICc_IC80lwr,pred_AICc, pred_AICc_IC80uppr, error_AICc, error_AICc_abs) %>% 
   xtable(caption = "Predicciones a 12 pasos y errores.", label = "errortest2") %>% 
   print.xtable(include.rownames = FALSE)
 
 
 
 pred_tbbl1 %>% 
-  select(fecha, reales, pred_manual, error_manual, error_manual_abs) %>% 
+  select(fecha, reales, pred_manual_IC80lwr, pred_manual, pred_manual_IC80lwr, error_manual, error_manual_abs) %>% 
   xtable(caption = "Predicciones a 12 pasos y errores.", label = "errortest2") %>% 
   print.xtable(include.rownames = FALSE)
 
+
+pred_train_tbbl[85:96,] %>% 
+  xtable(caption = "Predicciones a 1 pasos y errores.", label = "errortest2") %>% 
+  print.xtable(include.rownames = FALSE)
 
 ```
 

@@ -346,11 +346,11 @@ p_valores_box1 %>%
 
 ## Modelo manual: homocedasticidad
 
-```{r mcleodli, fig.cap="\\label{mcleodli}P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE, out.width="80%"}
+```{r mcleodli, fig.cap="\\label{mcleodli}P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE, out.width="60%"}
 McLeod.Li.test(modelo1, omit.initial = TRUE)
 ```
 
-Indicación que los modelos del tipo SARIMA puede no ser los más adecuados y se tendría que recurrir a los del tipo ARCH/GARCH donde se busca modelizar la varianza de los errores.
+* Indicación que los modelos del tipo SARIMA puede no ser los más adecuados y se tendría que recurrir a los del tipo ARCH/GARCH donde se busca modelizar la varianza de los errores.
 
 ## Modelo manual: normalidad
 
@@ -469,63 +469,39 @@ modelo\_manual & 3.9 & 2.7 & 8.0 & 0.20 \\
 \label{errortrain}
 \end{table}
 
+## Predicción dentro de la muestra
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+  \hline
+fecha & pred. man. & pred. AICc & Precios & e. man. & e. AICc \\ 
+  \hline
+2020-01 & 34.90 & 34.94 & 36.38 & 1.48 & 1.44 \\ 
+  2020-02 & 35.64 & 36.09 & 36.43 & 0.80 & 0.34 \\ 
+  2020-03 & 35.73 & 34.16 & 36.91 & 1.18 & 2.75 \\ 
+  2020-04 & 38.89 & 39.87 & 46.49 & 7.60 & 6.62 \\ 
+  2020-05 & 51.96 & 52.24 & 47.99 & -3.97 & -4.25 \\ 
+  2020-06 & 46.47 & 47.38 & 51.81 & 5.34 & 4.43 \\ 
+  2020-07 & 54.69 & 54.02 & 53.30 & -1.39 & -0.72 \\ 
+  2020-08 & 53.22 & 55.15 & 54.53 & 1.31 & -0.63 \\ 
+  2020-09 & 55.37 & 54.51 & 54.51 & -0.85 & 0.00 \\ 
+  2020-10 & 54.36 & 53.98 & 58.31 & 3.96 & 4.33 \\ 
+  2020-11 & 61.17 & 61.20 & 64.44 & 3.27 & 3.24 \\ 
+  2020-12 & 68.30 & 68.87 & 71.15 & 2.84 & 2.27 \\ 
+   \hline
+\end{tabular}
+\caption{Predicciones a 1 pasos y errores.} 
+\label{errortest2}
+\end{table}
+
 ## Predicción fuera de la muestra de entrenamiento
 
 * Una forma de evaluar las predicciones que busca simular el proceso de predecir al futuro pero teniéndose la posibilidad de evaluar la calidad de las predicciones es mediante la predicción fuera de la muestra de entrenamiento.
 
 * Se predice a 12 pasos (a un año dado que se trabaja con datos mensuales) y se compara con los 12 valores que se apartaron para conformar la muestra de prueba. Luego, se evalúan las medidas de error anteriormente discutidas.
 
-## Predicción fuera de la muestra
-
-\begin{table}[ht]
-\centering
-\begin{tabular}{lrrrr}
-  \hline
-Fecha & Precios & Pred. mod. AICc & Error mod. AICc & Error AICc abs. \\ 
-  \hline
-2021-06 & 26.74 & 31.27 & -4.52 & 4.52 \\ 
-  2021-07 & 27.92 & 32.00 & -4.09 & 4.09 \\ 
-  2021-08 & 27.96 & 34.10 & -6.13 & 6.13 \\ 
-  2021-09 & 29.50 & 34.29 & -4.79 & 4.79 \\ 
-  2021-10 & 33.40 & 34.70 & -1.30 & 1.30 \\ 
-  2021-11 & 36.70 & 35.55 & 1.15 & 1.15 \\ 
-  2021-12 & 37.50 & 36.40 & 1.10 & 1.10 \\ 
-  2022-01 & 40.12 & 36.90 & 3.22 & 3.22 \\ 
-  2022-02 & 36.59 & 35.37 & 1.21 & 1.21 \\ 
-  2022-03 & 33.73 & 33.03 & 0.70 & 0.70 \\ 
-  2022-04 & 34.90 & 34.31 & 0.59 & 0.59 \\ 
-  2022-05 & 32.03 & 34.88 & -2.85 & 2.85 \\ 
-   \hline
-\end{tabular}
-\caption{Predicciones a 12 pasos y errores, modelo AICc.} 
-\label{errortest2}
-\end{table}
-
-## Predicción fuera de la muestra
-
-\begin{table}[ht]
-\centering
-\begin{tabular}{lrrrr}
-  \hline
-Fecha & Reales & Pred. mod. manual & Error mod. manual & Error mod. manual abs. \\ 
-  \hline
-2021-06 & 26.74 & 30.81 & -4.07 & 4.07 \\ 
-  2021-07 & 27.92 & 32.11 & -4.19 & 4.19 \\ 
-  2021-08 & 27.96 & 35.08 & -7.12 & 7.12 \\ 
-  2021-09 & 29.50 & 35.18 & -5.68 & 5.68 \\ 
-  2021-10 & 33.40 & 35.35 & -1.95 & 1.95 \\ 
-  2021-11 & 36.70 & 35.68 & 1.02 & 1.02 \\ 
-  2021-12 & 37.50 & 35.91 & 1.59 & 1.59 \\ 
-  2022-01 & 40.12 & 35.74 & 4.38 & 4.38 \\ 
-  2022-02 & 36.59 & 35.76 & 0.83 & 0.83 \\ 
-  2022-03 & 33.73 & 35.95 & -2.22 & 2.22 \\ 
-  2022-04 & 34.90 & 39.92 & -5.01 & 5.01 \\ 
-  2022-05 & 32.03 & 40.54 & -8.51 & 8.51 \\ 
-   \hline
-\end{tabular}
-\caption{Predicciones a 12 pasos y errores, modelo manual.} 
-\label{errortest2}
-\end{table}
 
 ## Predicción fuera de la muestra de entrenamiento: medidas de error
 
@@ -566,7 +542,7 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 
 ```
 
-!["Predicciones a 12 pasos del precio de manzana, muestra de prueba."](plot1.jpg)
+!["Predicciones a 12 pasos del precio de manzana, muestra de prueba."](plot1.jpg){width=80%}
 
 ## Predicciones: modelo manual y modelo AICc
 
@@ -605,9 +581,60 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 # ggsave("plot2.jpg")
 ```
 
-!["Predicciones puntuales del precio de manzana e intervalos de predicción al 80\\%."](plot2.jpg)
+!["Predicciones puntuales del precio de manzana e intervalos de predicción al 80\\%."](plot2.jpg){width=80%}
 
 
+## Predicción fuera de la muestra
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrrr}
+  \hline
+fecha & reales & IC80 inf. & pred. & IC80 sup. & error & error abs. \\ 
+  \hline
+2021-06 & 26.74 & 26.30 & 31.27 & 35.52 & -4.52 & 4.52 \\ 
+  2021-07 & 27.92 & 22.69 & 32.00 & 40.60 & -4.09 & 4.09 \\ 
+  2021-08 & 27.96 & 20.05 & 34.10 & 46.57 & -6.13 & 6.13 \\ 
+  2021-09 & 29.50 & 16.34 & 34.29 & 49.77 & -4.79 & 4.79 \\ 
+  2021-10 & 33.40 & 14.47 & 34.70 & 52.63 & -1.30 & 1.30 \\ 
+  2021-11 & 36.70 & 12.85 & 35.55 & 56.03 & 1.15 & 1.15 \\ 
+  2021-12 & 37.50 & 11.44 & 36.40 & 59.33 & 1.10 & 1.10 \\ 
+  2022-01 & 40.12 & 10.31 & 36.90 & 61.86 & 3.22 & 3.22 \\ 
+  2022-02 & 36.59 & 7.23 & 35.37 & 62.45 & 1.21 & 1.21 \\ 
+  2022-03 & 33.73 & 2.78 & 33.03 & 61.95 & 0.70 & 0.70 \\ 
+  2022-04 & 34.90 & 2.04 & 34.31 & 64.96 & 0.59 & 0.59 \\ 
+  2022-05 & 32.03 & 1.48 & 34.88 & 66.92 & -2.85 & 2.85 \\ 
+   \hline
+\end{tabular}
+\caption{Predicciones a 12 pasos y errores, modelo AICc.} 
+\label{errortest2}
+\end{table}
+
+## Predicción fuera de la muestra
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+  \hline
+fecha & reales & IC80 inf. & pred. & error & error abs. \\ 
+  \hline
+2021-06 & 26.74 & 25.42 & 30.81 & -4.07 & 4.07 \\ 
+  2021-07 & 27.92 & 22.63 & 32.11 & -4.19 & 4.19 \\ 
+  2021-08 & 27.96 & 22.55 & 35.08 & -7.12 & 7.12 \\ 
+  2021-09 & 29.50 & 20.31 & 35.18 & -5.68 & 5.68 \\ 
+  2021-10 & 33.40 & 19.19 & 35.35 & -1.95 & 1.95 \\ 
+  2021-11 & 36.70 & 18.03 & 35.68 & 1.02 & 1.02 \\ 
+  2021-12 & 37.50 & 17.12 & 35.91 & 1.59 & 1.59 \\ 
+  2022-01 & 40.12 & 15.63 & 35.74 & 4.38 & 4.38 \\ 
+  2022-02 & 36.59 & 14.04 & 35.76 & 0.83 & 0.83 \\ 
+  2022-03 & 33.73 & 13.42 & 35.95 & -2.22 & 2.22 \\ 
+  2022-04 & 34.90 & 15.94 & 39.92 & -5.01 & 5.01 \\ 
+  2022-05 & 32.03 & 15.64 & 40.54 & -8.51 & 8.51 \\ 
+   \hline
+\end{tabular}
+\caption{Predicciones a 12 pasos y errores, modelo manual.} 
+\label{errortest2}
+\end{table}
 
 ## Conclusiones
 
