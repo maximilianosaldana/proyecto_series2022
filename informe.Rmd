@@ -1073,7 +1073,16 @@ pred_tbbl <- tibble(
   pred_AICc_IC80uppr = prediccion2_boot$upper[,4]
 ) 
 
-  
+pred_tbbl1 <- pred_tbbl %>% 
+  mutate(
+    reales = manzana_test,
+    fecha = format(fecha, format = "%Y-%m"),
+    error_manual = reales - pred_manual,
+    error_manual_abs = abs(reales - pred_manual),
+    error_AICc = reales - pred_AICc,
+    error_AICc_abs = abs(reales - pred_AICc)
+  )
+
 ggplot() +
   geom_line(data = tail(manzana_tbbl, 36), aes(x = fecha, y = precio)) +
   geom_line(data = pred_tbbl, aes(x = fecha, y = pred_manual, color = "modelo_manual")) +
@@ -1086,8 +1095,27 @@ ggplot() +
   ylab("Precio ($UY x Kg)") +
   labs(color = "", linetype = "Serie") +
   scale_color_brewer(palette = "Dark2") +
-  theme_bw()
+  theme_bw() 
 ```
+
+```{r tabla-error}
+
+pred_tbbl1 %>% 
+  select(fecha, reales, pred_AICc, error_AICc, error_AICc_abs) %>% 
+  xtable(caption = "Predicciones a 12 pasos y errores.", label = "errortest2") %>% 
+  print.xtable(include.rownames = FALSE)
+
+
+
+pred_tbbl1 %>% 
+  select(fecha, reales, pred_manual, error_manual, error_manual_abs) %>% 
+  xtable(caption = "Predicciones a 12 pasos y errores.", label = "errortest2") %>% 
+  print.xtable(include.rownames = FALSE)
+
+
+```
+
+
 
 # Conclusiones
 

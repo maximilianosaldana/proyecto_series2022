@@ -53,21 +53,17 @@ manzana_test <- window(manzana, start = c(2021, 6))
 ```
 
 
-# Introducción
-
 ## Introducción
 
 * Se modeliza la serie de precios mensuales mayoristas del kilo de manzana en la Unidad Agroalimentaria Metropolitana (ex Mercado Modelo).
 
-* Se cuentan con los datos desde enero de 2013 a mayo de 2022 y se considerará el promedio mensual de los precios, por lo que se cuenta con 113 observaciones.
-
 * Datos originales bisemanales, se opta por la frecuencia mensual debido a la dificultad de emplear las herramientas de modelado SARIMA para tales tipos de series.
+
+* Se cuentan con los datos desde enero de 2013 a mayo de 2022 y se considerará el promedio mensual de los precios, por lo que se cuenta con 113 observaciones.
 
 * Interés especial en la predicción.
 
-# Análisis descriptivo
-
-##
+## Análisis descriptivo
 
 ```{r plot_precios, fig.cap="\\label{plot_precios}Serie de precios mensuales del Kg de manzana en pesos uruguayos.", include=TRUE}
 autoplot(manzana) +
@@ -77,9 +73,9 @@ autoplot(manzana) +
 
 
 
-##
+## Análisis descriptivo
 
-```{r plot_precios_seas, fig.cap="\\label{plot_precios_seas}Serie de precios mensuales del Kg de manzana en pesos Uruguayos.", include = TRUE}
+```{r plot_precios_seas, fig.cap="\\label{plot_precios_seas} Gráfico estacionales y de series en el año de los precios mensuales del Kg de manzana en pesos Uruguayos.", include = TRUE}
 a <- ggseasonplot(manzana) +
   theme_bw() +
   labs(x = "Tiempo (Mes)",  y = "Precio promedio ($UY por Kg)", title = NULL, color = "Año")
@@ -92,26 +88,35 @@ b <- ggsubseriesplot(manzana) +
 grid.arrange(a, b, nrow = 1)
 ```
 
-##
+## Análisis descriptivo
 
-* Marcada estacionalidad anual
+```{r descomp, include=TRUE, fig.cap="\\label{descomp} Descomposición STL del precio de manzana."}
+ descomp <- stl(manzana, s.window = 13)
+ 
+ autoplot(descomp) +
+   labs(x = "Tiempo (Año)") +
+   theme_bw()
+```
 
-* En los últimos 5 años, ciclo corto que se repite cada 2 años.
+## Análisis descriptivo
 
-* Se realizó además la descomposición de la serie en tendencia/ciclo, estacionalidad y componente irregular. 
+<!-- * Marcada estacionalidad anual -->
 
-* Fuerza de la estacionalidad, definida como en [@hyndman2018]:
+<!-- * En los últimos 5 años, ciclo corto que se repite cada 2 años. -->
+
+<!-- * Se realizó además la descomposición de la serie en tendencia/ciclo, estacionalidad y componente irregular.  -->
+
+* Fuerza de la estacionalidad, definida en [@hyndman2018] como:
 
 $$F_s = max\left(0, 1-\frac{Var(R_t)}{Var(R_t+ S_t)}\right) = 0.51$$
-
-
-# Metodología y resultados
 
 ## Metodología
 
 * Se divide la serie original en muestras de entrenamiento y test:
-  * Muestra de entrenamiento hasta mayo de 2021, 101 observaciones
-  * Muestra de testeo entre junio de 2021 y mayo de 2022, 12 observaciones.
+  
+* Muestra de entrenamiento hasta mayo de 2021, 101 observaciones
+
+* Muestra de prueba entre junio de 2021 y mayo de 2022, 12 observaciones.
 
 ## Identificación manual de un modelo
 
@@ -165,10 +170,17 @@ grid.arrange(plot_acf1, plot_pacf1)
 # plot(spec_dif, main = "", xlab = "Frecuencia", ylab = "Estimación del espectro", ci.col=NULL)
 ```
 
+## Transformación logarítmica
+
+* Los gráficos de la serie no indican que sea de utilidad.
+
+* La transformación de Box-Cox máximo-verosímil no es la logarítmica.
 
 ## Tests de raíces unitarias
 
-* Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, si cuenta con una raíz unitaria. En dicho caso el proceso sería no estacionario la cual implicaría que no puede ser modelado en el marco de los ARMA. 
+* Dado que las funciones de autocorrelación dieron indicios de que el proceso no es estacionario, resulta de interés poner a prueba si el proceso es $I(1)$, es decir, si cuenta con una raíz unitaria. 
+
+* En dicho caso el proceso sería no estacionario la cual implicaría que no puede ser modelado en el marco de los ARMA. 
 
 * Utilizamos el test de Dickey-Fuller y el de Phillips-Perron.
 
@@ -186,17 +198,17 @@ grid.arrange(plot_acf1, plot_pacf1)
 
 <!-- Para la serie planteada, al observar los p-valores, ambos tests llevan a no rechazar la hipótesis de raíz unitaria al 95% de confianza. Esto lleva a concluir que una primera diferencia resulta necesaria para llevar la serie a la estacionariedad. -->
 
-##
+## Serie de diferencias
 
-```{r, fig.cap="\\label{plot_precios}Serie de precios mensuales del Kg de manzana con una diferencia regular, en pesos uruguayos.", include=TRUE}
+```{r, fig.cap="\\label{plot_precios}Serie de diferencias de precios mensuales del Kg de manzana.", include=TRUE}
 autoplot(diff(manzana)) +
   theme_bw() +
-  labs(x = "Tiempo (Años)",  y = "Precio promedio ($UY por Kg)")
+  labs(x = "Tiempo (Años)",  y = "Diferencia del precio")
 ```
 
-##
+## ACF y PACF: diferencias
 
-```{r acf2, include = TRUE, fig.cap= "\\label{acf2}Autocorrelograma y autocorrelograma parcial de la serie de primeras difernecias de precios de manzana."}
+```{r acf2, include = TRUE, fig.cap= "\\label{acf2}Autocorrelograma y autocorrelograma parcial de la serie de primeras diferencias de precios de manzana."}
 manzana_train_diff <- diff(manzana_train)
 
 acf1_diff <- ggAcf(manzana_train_diff, type = "correlation", plot = FALSE, lag = 72) 
@@ -215,30 +227,31 @@ grid.arrange(plot_acf1_diff, plot_pacf1_diff)
 
 ## Especificación manual del modelo
 
-* La primer autocorrelación resulta significativamente distinta de 0, indicio de un componente MA de primer orden.
-
-* Los para valores en torno a los lags 24 y 48 también lo son, indicio de dependencia estacional autorregresiva de orden 2.
-
 * Solo los dos primeros valores de la autocorrelación parcial son significativos, indicio de una estructura AR de orden 2.
 
+* La primer autocorrelación resulta significativamente distinta de 0, ¿indicio de un componente MA de primer orden?.
+
+* Para los valores en torno a los lags 24 y 48 también lo son, indicio de dependencia estacional autorregresiva de orden 2.
 
 Teniendo en cuenta este acercamiento metodológico, inicialmente se plantea un modelo $ARIMA(2,1,1)(2,0,0)$
 
 ## Selección mediante criterios de información
 
-Alternativamente especificamos un modelo mediante el Criterio de Información de Akaike corregido (AICc), mediante la función _auto.arima()_. Su fórmula para un determinado modelo es:
+* Alternativamente especificamos un modelo mediante el Criterio de Información de Akaike corregido (AICc), mediante la función _auto.arima()_. 
 
-$$AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$
+<!-- Su fórmula para un determinado modelo es: -->
 
-* $T$ el número de observaciones
+<!-- $$AICc = T \log{\hat{\sigma}^2_{MV}} + T \frac{1+k/T}{1-(k+2)/T}$$ -->
 
-* $k$ el número de parámetros 
+<!-- * $T$ el número de observaciones -->
 
-* $\hat{\sigma}^2_{MV}$ el estimador MLE de la varianza de los errores.
+<!-- * $k$ el número de parámetros  -->
 
-El modelo seleccionado es aquel con el menor valor del AICc, lo cual a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
+<!-- * $\hat{\sigma}^2_{MV}$ el estimador MLE de la varianza de los errores. -->
 
-El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,0,2)$.
+* Se eligirá auqel modelo con el menor valor del AICc, lo cual a nivel algorítmico se hace empleando la selección _stepwise_ a partir de un conjunto inicial de modelos [@hyndman2018].
+
+* El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,0,2)$.
 
 ## Estimación
 
@@ -248,19 +261,21 @@ El modelo seleccionado mediante esta metodología resulta en un $ARIMA(0,1,2)(0,
 
 * El supuesto anterior es fuerte pero las estimaciones resultantes serán razonables aunque el supuesto no se cumpla [@hamilton_1994].
 
-* En particular, el método empleado es la estimación máximo verosímil condicional, donde se supone que la primera observación de la serie es determinística y se maximiza la verosimilitud condicionada a dicha observación. Esto simplifica las expresiones de las funciones, y si el tamaño de muestra es razonablemente grande, la primera observación no tendrá gran efecto sobre la verosimilitud estimada. 
+* En particular, el método empleado es la estimación máximo verosímil condicional.
+
+<!-- , donde se supone que la primera observación de la serie es determinística y se maximiza la verosimilitud condicionada a dicha observación. Esto simplifica las expresiones de las funciones, y si el tamaño de muestra es razonablemente grande, la primera observación no tendrá gran efecto sobre la verosimilitud estimada.  -->
 
 
-## Pruebas de significación de los parámetros
+<!-- ## Pruebas de significación de los parámetros -->
 
-Para completar la especificación se realizan pruebas de hipótesis sobre la significación de los parámetros estimados. La hipótesis para cada uno de ellos, siendo $\lambda$ un parámetro cualquiera del modelo:
+<!-- Para completar la especificación se realizan pruebas de hipótesis sobre la significación de los parámetros estimados. La hipótesis para cada uno de ellos, siendo $\lambda$ un parámetro cualquiera del modelo: -->
 
-$$H_0) \lambda = 0$$
-$$H_1)\lambda \ne 0$$
-Donde el estadístico empleado es:
+<!-- $$H_0) \lambda = 0$$ -->
+<!-- $$H_1)\lambda \ne 0$$ -->
+<!-- Donde el estadístico empleado es: -->
 
-$$z = \hat{\lambda} / \hat{\sigma}_{\lambda}$$
-Para el que se cumplirá la Normalidad asintótica debido a que la estimación se realizó por máxima verosimilitud [@hamilton_1994, p. 143].
+<!-- $$z = \hat{\lambda} / \hat{\sigma}_{\lambda}$$ -->
+<!-- Para el que se cumplirá la Normalidad asintótica debido a que la estimación se realizó por máxima verosimilitud [@hamilton_1994, p. 143]. -->
 
 ## Estimación de los parámetros para el modelo especificado manualmente
 
@@ -268,17 +283,18 @@ Para el que se cumplirá la Normalidad asintótica debido a que la estimación s
 
 * Como consecuencia, optamos por eliminar el componente MA de la especificación y restringir el primer parámetro sAR a 0.
 
-La especificación del _modelo manual_ final es:
+## Especificación del _modelo manual_ final es
 
 $$\Phi_2(L^{12})\phi_2(L)\Delta^1 Y_t =  \varepsilon_t$$
 Donde:
 
-$$\Phi_2(L^{12}) = 1-0.415 L^{24}$$
+* $\Phi_2(L^{12}) = 1-0.415 L^{24}$
 
-$$\phi_2(L) = 1-0.557 L - (-0.277) L^{2}$$
+* $\phi_2(L) = 1-0.557 L - (-0.277) L^{2}$
 
-$$\Delta^1 = 1-L$$
-Y se supone $\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \hat\sigma^2=15.82) \; \forall \, t$
+* $\Delta^1 = 1-L$
+
+* $\epsilon_t \stackrel{\text{iid}}{\sim} N(0, \hat\sigma^2=15.82) \; \forall \, t$
 
 
 ## Diagnóstico
@@ -297,7 +313,7 @@ Para evaluar si el modelo es adecuado se ponen a prueba los supuestos realizados
 
 ## Modelo manual: incorrelación de los errores
 
-```{r ljungbox, fig.cap="\\label{ljungbox}P-valores de pruebas conjuntas de autocorrelación nula de Ljung-Box"}
+```{r ljungbox, include = TRUE, fig.cap="\\label{ljungbox}P-valores de pruebas conjuntas de autocorrelación nula de Ljung-Box"}
 modelo1 <- Arima( 
   manzana_train, 
   order = c(2, 1, 0), 
@@ -306,23 +322,31 @@ modelo1 <- Arima(
   ) 
 
 
-lmtest::coeftest(modelo1) 
+#lmtest::coeftest(modelo1) 
 
 r1 <- residuals(modelo1)
 
 # Gráfico de los residuos: los outliers causarán problemas con la normalidad
-autoplot(r1)
+#autoplot(r1)
 
 # Prueba de Ljung-Box
 p_valores_box1 <- tibble(
   lag = 5:36, 
   p_valores = sapply(5:36, function(i) Box.test(r1, lag = i, fitdf = 3, type = "Ljung-Box")$p.value)
   )
+
+p_valores_box1 %>%
+  ggplot() +
+  geom_point(aes(lag, p_valores))+
+  theme_bw() +
+  geom_hline(yintercept = 0.05, color="red") +
+  xlab("Rezago") +
+  ylab("p-valor")
 ```
 
 ## Modelo manual: homocedasticidad
 
-```{r mcleodli, fig.cap="\\label{mcleodli}P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE}
+```{r mcleodli, fig.cap="\\label{mcleodli}P-valores del test de McLeod-Li para los primeros 19 rezagos", include = TRUE, out.width="80%"}
 McLeod.Li.test(modelo1, omit.initial = TRUE)
 ```
 
@@ -341,7 +365,6 @@ Indicación que los modelos del tipo SARIMA puede no ser los más adecuados y se
 * Para el modelo intervenido, se cumple el supuesto de normalidad pero no el de autocorrelación de los residuos, que sí se cumplía para el anterior. Por lo tanto, deshechamos la intervención.
 
 
-
 ## Modelos alternativos
 
 Una vez se llegó al final de la etapa de diagnóstico del modelo planteado de forma manual, optamos por evaluar otros modelos alternativos seleccionados a partir de métodos automáticos, para tener varias opciones a la hora de evaluar el desempeño de las predicciones y compararlos con el modelo manual.
@@ -351,7 +374,7 @@ Una vez se llegó al final de la etapa de diagnóstico del modelo planteado de f
 
 * Se seleccionó un modelo utilizando el Criterio de Información de Akaike  corregido ($AICc$), que tiene la forma $ARIMA(0,1,2)(0,0,2)$.
 
-* Los parámetros de medias móviles son significativos, así como el parámetro de medias móviles estacionales de segundo orden, pero no el de primer orden.
+* Los parámetros de medias móviles son significativos, así como el parámetro de medias móviles estacionales de segundo orden, pero no el de primer orden (no lo restringimos).
 
 * No se rechaza la hipótesis de no autocorrelación ni tampoco la de media nula, pero la homocedasticidad no se cumple para todos los rezagos, y se rechaza la hipótesis de normalidad.
 
@@ -375,37 +398,51 @@ Una vez se llegó al final de la etapa de diagnóstico del modelo planteado de f
 
 ## Modelo seleccionado por _ets_
 
-Finalmente se selecciona un modelo de una clase distinta a los $ARIMA$, de la familia de los de suavizado exponencial, que hacen uso de promedios ponderados de las observaciones (_modelo ets_), y tienen como base modelos estructurales o espacio-estado. Este tipo de modelos permiten una estructura de varianzas que cambia en el tiempo, por lo cual no se requiere el supuesto de homocedasticidad de los residuos.
+* Modelo de la familia de los de suavizado exponencial (_modelo ets_). 
 
-Por su parte, el supuesto de no autocorrelación de los mismos sí se cumple.
+* Hacen uso de promedios ponderados de las observaciones.
+
+* Tienen como base modelos estructurales o espacio-estado. Este tipo de modelos permiten una estructura de varianzas que cambia en el tiempo, por lo cual no se requiere el supuesto de homocedasticidad de los residuos.
+
+* Por su parte, el supuesto de no autocorrelación de los mismos sí se cumple.
 
 
 ## Predicción
 
-Una vez se cuenta con un modelo (o una selección de modelos) que se suponen correctos, tanto en especificación como en estimación, se puede proceder a la predicción de los valores futuros de la serie condicionando a los valores con los cuales se cuenta. Para los datos empleados, los precios mayoristas de manzana, resulta de particular interés la predicción a futuro, dado que lo que ocurra con el precio incidirá tanto en la producción como en el consumo del bien y puede ser un insumo para la toma de decisiones a nivel de política económica.
+* Resulta de particular interés la predicción a futuro, dado que lo que ocurra con el precio incidirá tanto en la producción como en el consumo del bien y puede ser un insumo para la toma de decisiones a nivel de política económica.
 
-* Función de costos cuadrática: $C(e) = a e^2$. Minimizar el valor esperado de esta función implica minimizar el error cuadrático medio a un horizonte predictivo de $s$ pasos, condicional a las $t$ observaciones con las que se cuenta: $E(Y_{t+1}-Y^*_{t+1|t})^2$. Se llega a que la predicción óptima es la esperanza condicional: $Y^*_{t+1|t} = E(Y_{t+1}|Y_t)$.
+* Predicciones puntuales: esperanza condicional.
 
-$$\hat{E}[Y_{t+s} | \varepsilon_t, \varepsilon_{t-1}, \dots] = \psi_s\varepsilon_t + \psi_{s+1}\varepsilon_{t-1} + \psi_{s+2}\varepsilon_{t-2} + \dots$$
 
-* Cuantificamos la incertidumbre que tenemos sobre la predicción puntual mediante intervalos de predicción, los cuales se pueden interpretar como la dispersión de posibles resultados relativa a dichos valores puntuales calculados, para un nivel de confianza dado [@ericsson_2001]. En el caso que se cumpla el supuesto de normalidad, se puede emplear la expresión indicada en la sección \autoref{norm} y en caso contrario se pueden obtener mediante métodos de bootstrap (como se discutió en la sección \autoref{inter}).  
+<!-- * Función de costos cuadrática: $C(e) = a e^2$. Minimizar el valor esperado de esta función implica minimizar el error cuadrático medio a un horizonte predictivo de $s$ pasos, condicional a las $t$ observaciones con las que se cuenta: $E(Y_{t+1}-Y^*_{t+1|t})^2$. Se llega a que la predicción óptima es la esperanza condicional: $Y^*_{t+1|t} = E(Y_{t+1}|Y_t)$. -->
+
+<!-- $$\hat{E}[Y_{t+s} | \varepsilon_t, \varepsilon_{t-1}, \dots] = \psi_s\varepsilon_t + \psi_{s+1}\varepsilon_{t-1} + \psi_{s+2}\varepsilon_{t-2} + \dots$$ -->
+
+* Incertidumbre sobre la predicción puntual: intervalos de predicción.
+
+<!-- los cuales se pueden interpretar como la dispersión de posibles resultados relativa a dichos valores puntuales calculados, para un nivel de confianza dado [@ericsson_2001].  -->
+
+* En el caso que se cumpla el supuesto de normalidad, se puede emplear la expresión: $\hat{Y}_{t+h |t} \pm z_{\alpha/2}\hat{\sigma}_{t+h}$ 
+
+* En caso contrario se pueden obtener mediante métodos de bootstrap.
 
 
 ## Medidas de error de predicción
 
-Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a cuatro medidas de error.
+* Para cuantificar el error que se comete al comparar predicción contra valor verdadero, se recurre a cuatro medidas de error. Sea $e_s =  Y_{t+s} - Y^*_{t+s|t}$, $p_s = 100e_t/Y_s$ y $q_s = e_t/(\frac{1}{n-1}\sum_{j=1}^n |Y_j-Y_{j-1}|)$ : 
 
-La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico [@hyndman_koehler_2006]. Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers. Sea $e_s =  Y_{t+s} - Y^*_{t+s|t}$: 
 
-* Raíz del error cuadrático medio (RMSE) = $\sum_{i=1}^s e_i^2$
+<!-- La raíz del error cuadrático medio  (RMSE) y el error absoluto medio (MAE) son dos medidas ampliamente usadas, debido a su relevancia en el modelado estadístico [@hyndman_koehler_2006]. Ambas medidas son dependientes de la escala, por lo que no pueden usarse para comparar el error de modelos que no están en la misma escala y además son sensibles a los outliers.  -->
+  
+  * Raíz del error cuadrático medio (RMSE) = $\sum_{i=1}^s e_i^2$
 
-* Error absoluto medio (MAE) = $\sum_{i=1}^s |e_i|$
+  * Error absoluto medio (MAE) = $\sum_{i=1}^s |e_i|$
 
-Ootro tipo de medidas son las basadas en errores porcentuales. Dichos errores están dados por: $p_s = 100e_t/Y_s$. Este tipo de medidas son independientes de la escala, lo que las hace idóneas para comparar el desempeño predictivo de modelos con distintas escalas (como es el caso de nuestra selección).
+<!-- Ootro tipo de medidas son las basadas en errores porcentuales. Dichos errores están dados por: . Este tipo de medidas son independientes de la escala, lo que las hace idóneas para comparar el desempeño predictivo de modelos con distintas escalas (como es el caso de nuestra selección). -->
 
 * Media de los valores absolutos de los porcentajes de error (MAPE) = $\sum_{i=1}^s|p_i|$
 
-Para enfrentarse a las problemáticas de las medidas de error antes presentadas, en @hyndman_koehler_2006 se propone una medida donde se usan los errores escalados con el MAE dentro de la muestra: $q_s = e_t/(\frac{1}{n-1}\sum_{j=1}^n |Y_j-Y_{j-1}|)$ y la fórmula de la medida es:
+<!-- Para enfrentarse a las problemáticas de las medidas de error antes presentadas, en @hyndman_koehler_2006 se propone una medida donde se usan los errores escalados con el MAE dentro de la muestra: y la fórmula de la medida es: -->
 
 * Error escalado absoluto medio (MASE) = $\sum_{i=1}^s|q_i|$
 
@@ -438,6 +475,60 @@ modelo\_manual & 3.9 & 2.7 & 8.0 & 0.20 \\
 
 * Se predice a 12 pasos (a un año dado que se trabaja con datos mensuales) y se compara con los 12 valores que se apartaron para conformar la muestra de prueba. Luego, se evalúan las medidas de error anteriormente discutidas.
 
+## Predicción fuera de la muestra
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrr}
+  \hline
+Fecha & Precios & Pred. mod. AICc & Error mod. AICc & Error AICc abs. \\ 
+  \hline
+2021-06 & 26.74 & 31.27 & -4.52 & 4.52 \\ 
+  2021-07 & 27.92 & 32.00 & -4.09 & 4.09 \\ 
+  2021-08 & 27.96 & 34.10 & -6.13 & 6.13 \\ 
+  2021-09 & 29.50 & 34.29 & -4.79 & 4.79 \\ 
+  2021-10 & 33.40 & 34.70 & -1.30 & 1.30 \\ 
+  2021-11 & 36.70 & 35.55 & 1.15 & 1.15 \\ 
+  2021-12 & 37.50 & 36.40 & 1.10 & 1.10 \\ 
+  2022-01 & 40.12 & 36.90 & 3.22 & 3.22 \\ 
+  2022-02 & 36.59 & 35.37 & 1.21 & 1.21 \\ 
+  2022-03 & 33.73 & 33.03 & 0.70 & 0.70 \\ 
+  2022-04 & 34.90 & 34.31 & 0.59 & 0.59 \\ 
+  2022-05 & 32.03 & 34.88 & -2.85 & 2.85 \\ 
+   \hline
+\end{tabular}
+\caption{Predicciones a 12 pasos y errores, modelo AICc.} 
+\label{errortest2}
+\end{table}
+
+## Predicción fuera de la muestra
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrr}
+  \hline
+Fecha & Reales & Pred. mod. manual & Error mod. manual & Error mod. manual abs. \\ 
+  \hline
+2021-06 & 26.74 & 30.81 & -4.07 & 4.07 \\ 
+  2021-07 & 27.92 & 32.11 & -4.19 & 4.19 \\ 
+  2021-08 & 27.96 & 35.08 & -7.12 & 7.12 \\ 
+  2021-09 & 29.50 & 35.18 & -5.68 & 5.68 \\ 
+  2021-10 & 33.40 & 35.35 & -1.95 & 1.95 \\ 
+  2021-11 & 36.70 & 35.68 & 1.02 & 1.02 \\ 
+  2021-12 & 37.50 & 35.91 & 1.59 & 1.59 \\ 
+  2022-01 & 40.12 & 35.74 & 4.38 & 4.38 \\ 
+  2022-02 & 36.59 & 35.76 & 0.83 & 0.83 \\ 
+  2022-03 & 33.73 & 35.95 & -2.22 & 2.22 \\ 
+  2022-04 & 34.90 & 39.92 & -5.01 & 5.01 \\ 
+  2022-05 & 32.03 & 40.54 & -8.51 & 8.51 \\ 
+   \hline
+\end{tabular}
+\caption{Predicciones a 12 pasos y errores, modelo manual.} 
+\label{errortest2}
+\end{table}
+
+## Predicción fuera de la muestra de entrenamiento: medidas de error
+
 \begin{table}[ht]
 \centering
 \begin{tabular}{lllll}
@@ -455,7 +546,7 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 \label{errortest}
 \end{table}
 
-## 
+## Predicción fuera de la muestra 
 
 ```{r plot_predicciones, include = TRUE, fig.cap= "\\label{plot_predicciones}Predicciones a 12 pasos del precio de manzana, muestra de prueba."}
 # ggplot() +
@@ -477,7 +568,7 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 
 !["Predicciones a 12 pasos del precio de manzana, muestra de prueba."](plot1.jpg)
 
-##
+## Predicciones: modelo manual y modelo AICc
 
 ```{r preds, include=TRUE, fig.cap="\\label{preds}Predicciones puntuales del precio de manzana e intervalos de predicción al 80\\%."}
 # 
@@ -514,21 +605,22 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 # ggsave("plot2.jpg")
 ```
 
-!["Predicciones puntuales del precio de manzana e intervalos de predicción al 80\\%."](plot1.jpg)
+!["Predicciones puntuales del precio de manzana e intervalos de predicción al 80\\%."](plot2.jpg)
 
 
-# Conclusiones
 
-## Conclusiones: metodología de Box y Jenkins
+## Conclusiones
 
 * Siguiendo la metodología de Box y Jenkins se llegó a un modelo autorregresivo con una diferencia, con un componente estacional también autorregresivo.
 
-* Este cumplió los supuestos que se hicieron en su especificación con la excepción del de normalidad y homoscedasticidad. El primero afecta los intervalos de predicción y pudo ser subsanado mediante _bootstrap_, mientras que el segundo puede ser una señal de que debe ser considerado un modelo que modele la heteroscedasticidad, como por ejemplo los del tipo ARCH/GARCH.
+* Este cumplió los supuestos que se hicieron en su especificación con la excepción del de normalidad y homoscedasticidad. 
+
+<!-- El primero afecta los intervalos de predicción y pudo ser subsanado mediante _bootstrap_, mientras que el segundo puede ser una señal de que debe ser considerado un modelo que modele la heteroscedasticidad, como por ejemplo los del tipo ARCH/GARCH. -->
 
 * Como alternativa a este modelo trabajado de manera "manual" se planteó un conjunto de modelos seleccionados mediante metodologías de carácter automatizado, como lo son la selección mediante criterios de información. 
 
 
-## Conclusiones: modelos con intervenciones
+## Conclusiones
 
 * La serie cuenta con valores atípicos los cuales se intentaron subsanar incluyendo intervenciones, pero en el caso de los modelos que las incluían se observó mayor error a la hora de la predicción fuera de la muestra.
 
@@ -538,7 +630,7 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 
 * La modelización con mejor desempeño predictivo fue la elegida mediante el criterio de Akaike corregido y sin intervenciones, siendo la segunda mejor la especificada manualmente.
 
-## Conclusiones: efecto de la pandemia
+## Conclusiones
 
 * El hecho de que la predicción se haga con el trasfondo de la pandemia de Coronavirus aumenta la incertidumbre de una forma que es difícil cuantificar, porque todavía no se tiene la distancia temporal suficiente para concluir si causó un quiebre en la estructura de los precios.
 
@@ -547,8 +639,6 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 
 
 
-
-# Bibliografía
 
 ## Bibliografía 
 
@@ -559,13 +649,7 @@ modelo\_manual &  4.5 &  3.9 & 12.4 & 0.28 \\
 
 
 
-```{r descomp, include=TRUE, fig.cap="\\label{descomp} Descomposición STL del precio de manzana."}
-# descomp <- stl(manzana, s.window = 13)
-# 
-# autoplot(descomp) +
-#   labs(x = "Tiempo (Año)") +
-#   theme_bw()
-```
+
 
 ```{r}
 # # Fuerza de la estacionalidad
